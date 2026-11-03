@@ -18,6 +18,11 @@ describe('tags/raw', function () {
     const html = await liquid.parseAndRender(src)
     return expect(html).toBe(dst)
   })
+  it('should support whitespace control on endraw', function () {
+    expect(liquid.parseAndRenderSync('> {%- raw -%} inner {%- endraw -%} <')).toBe('> inner <')
+    expect(liquid.parseAndRenderSync('> {%- raw -%} inner {%- endraw %} <')).toBe('> inner  <')
+    expect(liquid.parseAndRenderSync('> {%- raw -%}{{ test }}{%- endraw -%} <')).toBe('>{{ test }}<')
+  })
   it('should support sync', function () {
     const html = liquid.parseAndRenderSync('{% raw %}{{foo}}{% endraw %}')
     return expect(html).toBe('{{foo}}')
