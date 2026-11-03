@@ -11,6 +11,7 @@ export class Tokenizer {
   N: number
   public groupedExpressions: boolean
   private rawBeginAt = -1
+  private rawEndName = ''
   private opTrie: Trie<OperatorHandler>
   private literalTrie: Trie<LiteralValue>
 
@@ -152,7 +153,10 @@ export class Tokenizer {
       throw this.error(`tag ${this.snapshot(begin)} not closed`, begin)
     }
     const token = new TagToken(input, begin, this.p, options, file)
-    if (token.name === 'raw') this.rawBeginAt = begin
+    if (options.rawTags.includes(token.name)) {
+      this.rawBeginAt = begin
+      this.rawEndName = 'end' + token.name
+    }
     return token
   }
 
@@ -185,7 +189,7 @@ export class Tokenizer {
     let leftPos = this.readTo(tagDelimiterLeft) - tagDelimiterLeft.length
     while (this.p < this.N) {
       if (this.peek() === '-') this.p++
-      if (this.readIdentifier().getText() !== 'endraw') {
+      if (this.readIdentifier().getText() !== this.rawEndName) {
         leftPos = this.readTo(tagDelimiterLeft) - tagDelimiterLeft.length
         continue
       }
@@ -204,7 +208,7 @@ export class Tokenizer {
         this.p++
       }
     }
-    throw this.error(`raw ${this.snapshot(this.rawBeginAt)} not closed`, begin)
+    throw this.error(`${this.rawEndName.slice(3)} ${this.snapshot(this.rawBeginAt)} not closed`, begin)
   }
 
   readLiquidTagTokens (options: NormalizedFullOptions = defaultOptions): LiquidTagToken[] {

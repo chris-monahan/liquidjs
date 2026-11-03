@@ -144,6 +144,24 @@ It defaults to `false`. For example, when set to `true`, a blank string would ev
 Nonexistent tags always throw errors during parsing and this behavior cannot be customized.
 {% endnote %}
 
+## Raw Tags
+
+**rawTags** lists tags whose content is output as-is until the matching end tag, the way [raw][raw-tag] works. Liquid inside them isn't parsed, so they can hold content that isn't valid Liquid, like the JSON in Shopify's `{%raw%}{% schema %}{%endraw%}` tag. Defaults to `['raw']`.
+
+Each listed tag still needs an implementation, registered with [registerTag][register-tags]; its content arrives as a single HTML token:
+
+```javascript
+const engine = new Liquid({ rawTags: ['raw', 'schema'] })
+engine.registerTag('schema', {
+  parse (token, remainTokens) {
+    this.content = ''
+    let next
+    while ((next = remainTokens.shift()) && next.name !== 'endschema') this.content += next.getText()
+  },
+  render () { return '' }
+})
+```
+
 ## Parameter Order
 
 Parameter orders are ignored by default, for example `{% for i in (1..8) reversed limit:3 %}` will always perform `limit` before `reversed`, even if `reversed` occurs before `limit`. To make parameter order respected, set **orderedFilterParameters** to `true`. Its default value is `false`.
@@ -161,3 +179,5 @@ Parameter orders are ignored by default, for example `{% for i in (1..8) reverse
 [jekyllInclude]: /api/interfaces/LiquidOptions.html#jekyllInclude
 [raw]: ../filters/raw.html
 [outputEscape]: /api/interfaces/LiquidOptions.html#outputEscape
+[raw-tag]: ../tags/raw.html
+[register-tags]: ./register-filters-tags.html
