@@ -144,6 +144,25 @@ It defaults to `false`. For example, when set to `true`, a blank string would ev
 Nonexistent tags always throw errors during parsing and this behavior cannot be customized.
 {% endnote %}
 
+## Ruby Numbers
+
+JavaScript has a single number type, so by default `{%raw%}{{ 2.0 }}{%endraw%}` renders `2` and `{%raw%}{{ 10 | divided_by: 4 }}{%endraw%}` renders `2.5`. Setting **rubyNumbers** to `true` follows Shopify/liquid instead:
+
+- Literals with a decimal point are floats, rendered like Ruby: `{%raw%}{{ 2.0 }}{%endraw%}` renders `2.0`.
+- Math filters keep integer arithmetic integer: `{%raw%}{{ 10 | divided_by: 4 }}{%endraw%}` renders `2`, and dividing an integer by zero throws `divided by 0`.
+- Arithmetic with floats is exact decimal arithmetic, like Ruby's BigDecimal: `{%raw%}{{ 0.1 | plus: 0.2 }}{%endraw%}` renders `0.3`.
+- Strings convert like Ruby: `'3.5'` is a float, other strings take their leading integer (`'1,234'` is `1`, `'abc'` is `0`).
+
+Since JavaScript numbers can't tell `2.0` from `2`, wrap floats in data with `LiquidFloat` to keep them floats; non-integer numbers are always treated as floats:
+
+```javascript
+const { Liquid, LiquidFloat } = require('liquidjs')
+const engine = new Liquid({ rubyNumbers: true })
+engine.parseAndRenderSync('{{ price | times: 2 }}', { price: new LiquidFloat(3) }) // '6.0'
+```
+
+Defaults to `false`.
+
 ## Inline Errors
 
 By default the first error aborts rendering. With **inlineErrors** set to `true`, each failing tag or output is replaced by an error message and rendering continues, like Shopify/liquid's `Template#render`:
