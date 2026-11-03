@@ -2,6 +2,7 @@ import { Liquid, TagToken, TopLevelToken, Tag } from '..'
 import { isTagToken } from '../util'
 
 export default class extends Tag {
+  get blank () { return this.tokens.length === 0 }
   private tokens: TopLevelToken[] = []
   constructor (tagToken: TagToken, remainTokens: TopLevelToken[], liquid: Liquid) {
     super(tagToken, remainTokens, liquid)

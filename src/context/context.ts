@@ -4,6 +4,7 @@ import { __assign } from 'tslib'
 import { NormalizedFullOptions, defaultOptions, RenderOptions } from '../liquid-options'
 import { createScope, Scope } from './scope'
 import { hasOwnProperty, isArray, isNil, isUndefined, isString, isFunction, isNumber, toLiquid, InternalUndefinedVariableError, toValueSync, isObject, Limiter, toValue, readArrayElement } from '../util'
+import type { LiquidError } from '../util/error'
 
 type PropertyKey = string | number;
 
@@ -42,6 +43,8 @@ export class Context {
   public ownPropertyOnly: boolean;
   public memoryLimit: Limiter;
   public renderLimit: Limiter;
+  /** Errors caught by `inlineErrors`, including those from partials */
+  public errors: LiquidError[];
   public constructor (env: object = {}, opts: NormalizedFullOptions = defaultOptions, renderOptions: RenderOptions = {}, { memoryLimit, renderLimit, liquid }: { memoryLimit?: Limiter, renderLimit?: Limiter, liquid?: any } = {}) {
     this.sync = !!renderOptions.sync
     this.opts = opts
@@ -52,6 +55,7 @@ export class Context {
     this.memoryLimit = memoryLimit ?? new Limiter('memory alloc', renderOptions.memoryLimit ?? opts.memoryLimit)
     this.renderLimit = renderLimit ?? new Limiter('template render', getPerformance().now() + (renderOptions.renderLimit ?? opts.renderLimit))
     this.liquid = liquid
+    this.errors = renderOptions.errors ?? []
   }
   public getRegister<T> (key: string, defaultValue: T = undefined as T): T {
     return (this.registers[key] = this.registers[key] || defaultValue)
@@ -112,7 +116,8 @@ export class Context {
       sync: this.sync,
       globals: this.globals,
       strictVariables: this.strictVariables,
-      ownPropertyOnly: this.ownPropertyOnly
+      ownPropertyOnly: this.ownPropertyOnly,
+      errors: this.errors
     }, {
       renderLimit: this.renderLimit,
       memoryLimit: this.memoryLimit,

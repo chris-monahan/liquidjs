@@ -1,15 +1,16 @@
+import { isBlank, Arguments } from '../template'
 import { Hash, ValueToken, Liquid, Tag, evalToken, Emitter, TagToken, TopLevelToken, Context, Template, ParseStream, FilteredValueToken } from '..'
 import { assertEmpty, isValueToken, toEnumerable } from '../util'
 import { createScope } from '../context/scope'
 import { ForloopDrop } from '../drop/forloop-drop'
 import { Parser } from '../parser'
-import { Arguments } from '../template'
 
 const MODIFIERS = ['offset', 'limit', 'reversed']
 
 type valueOf<T> = T[keyof T]
 
 export default class extends Tag {
+  get blank () { return isBlank(this.templates) && isBlank(this.elseTemplates) }
   variable: string
   collection: ValueToken | FilteredValueToken
   hash: Hash

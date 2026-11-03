@@ -1,11 +1,12 @@
+import { isBlank, Arguments } from '../template'
 import { isValueToken, toEnumerable } from '../util'
 import { createScope } from '../context/scope'
 import { ValueToken, Liquid, Tag, evalToken, Emitter, Hash, TagToken, TopLevelToken, Context, Template, ParseStream, FilteredValueToken } from '..'
 import { TablerowloopDrop } from '../drop/tablerowloop-drop'
 import { Parser } from '../parser'
-import { Arguments } from '../template'
 
 export default class extends Tag {
+  get blank () { return isBlank(this.templates) }
   variable: string
   args: Hash
   templates: Template[]

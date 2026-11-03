@@ -1,5 +1,5 @@
 import { FS } from './fs'
-import { assert, LiquidAsync, toLiquidAsync } from '../util'
+import { assert, LiquidAsync, toLiquidAsync, LiquidRuntimeError } from '../util'
 
 export interface LoaderOptions {
   fs: FS;
@@ -79,7 +79,7 @@ export class Loader {
   }
 
   private lookupError (file: string, roots: string[]) {
-    const err = new Error('ENOENT') as any
+    const err = new LiquidRuntimeError('ENOENT') as any
     err.message = `ENOENT: Failed to lookup "${file}" in "${roots}"`
     err.code = 'ENOENT'
     return err

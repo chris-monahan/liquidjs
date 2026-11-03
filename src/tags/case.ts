@@ -1,9 +1,10 @@
+import { isBlank, Arguments } from '../template'
 import { ValueToken, Liquid, toValue, evalToken, Value, Emitter, TagToken, TopLevelToken, Context, Template, Tag, ParseStream, FilteredValueToken } from '..'
 import { Parser } from '../parser'
 import { equals } from '../render'
-import { Arguments } from '../template'
 
 export default class extends Tag {
+  get blank () { return this.branches.every(b => isBlank(b.templates)) && isBlank(this.elseTemplates) }
   value: Value
   branches: { values: (ValueToken | FilteredValueToken)[], templates: Template[] }[] = []
   elseTemplates: Template[] = []

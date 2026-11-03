@@ -162,6 +162,26 @@ engine.registerTag('schema', {
 })
 ```
 
+## Inline Errors
+
+By default the first error aborts rendering. With **inlineErrors** set to `true`, each failing tag or output is replaced by an error message and rendering continues, like Shopify/liquid's `Template#render`:
+
+```javascript
+const engine = new Liquid({ inlineErrors: true })
+engine.registerFilter('fail', () => { throw new LiquidRuntimeError('something went wrong') })
+engine.parseAndRenderSync('before {{ 1 | fail }} after')
+// 'before Liquid error (line 1): something went wrong after'
+```
+
+- Only Liquid errors show their message: errors thrown by LiquidJS itself, and `LiquidRuntimeError` thrown by filters and tags. Other exceptions render as `internal`.
+- To read the original errors, pass an array as the `errors` render option; every caught error is pushed to it, including those from partials.
+- Render, memory and parse limits still throw.
+- With `strictVariables`, undefined variables are collected but render nothing.
+
+**suppressBlankTagErrors** renders nothing for errors from tags whose content is blank (whitespace, `assign`, `capture` and comments), like Shopify/liquid's `lax` and `strict` error modes. Defaults to `false`.
+
+**formatError** customizes the message. It receives the error message (`internal` for non-Liquid errors), line, template name and whether it's a syntax error. Defaults to `formatInlineError`.
+
 ## Parameter Order
 
 Parameter orders are ignored by default, for example `{% for i in (1..8) reversed limit:3 %}` will always perform `limit` before `reversed`, even if `reversed` occurs before `limit`. To make parameter order respected, set **orderedFilterParameters** to `true`. Its default value is `false`.
