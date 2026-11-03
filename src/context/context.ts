@@ -5,6 +5,7 @@ import { NormalizedFullOptions, defaultOptions, RenderOptions } from '../liquid-
 import { createScope, Scope } from './scope'
 import { hasOwnProperty, isArray, isNil, isUndefined, isString, isFunction, isNumber, toLiquid, InternalUndefinedVariableError, toValueSync, isObject, Limiter, toValue, readArrayElement } from '../util'
 import type { LiquidError } from '../util/error'
+import { LiquidFloat } from '../util/liquid-float'
 
 type PropertyKey = string | number;
 
@@ -136,6 +137,7 @@ export class Context {
     obj = toLiquid(obj)
     key = toValue(key) as PropertyKey
     if (isNil(obj)) return obj
+    if (obj instanceof LiquidFloat) return undefined
     if (isArray(obj) && isNumber(key)) return readArrayElement(obj, key, this.ownPropertyOnly)
     const value = readJSProperty(obj, key, this.ownPropertyOnly)
     if (value === undefined && obj instanceof Drop) return obj.liquidMethodMissing(key, this)

@@ -93,6 +93,8 @@ export interface LiquidOptions {
   groupedExpressions?: boolean;
   /** Tags whose content is output as-is until the matching `end` tag, like `raw`. Defaults to `['raw']`. */
   rawTags?: string[];
+  /** Distinguish integers from floats and follow Shopify/liquid's number semantics: `1.5` literals are floats, `{{ 2.0 }}` renders `2.0`, and math filters use Ruby's rules (`10 | divided_by: 4` is `2`, `0.1 | plus: 0.2` is `0.3`). Wrap floats in data with `LiquidFloat`. Defaults to `false`. */
+  rubyNumbers?: boolean;
   /** Render each failing tag or output as an error message in place, and continue rendering, like Shopify/liquid's `Template#render`. Errors other than Liquid errors (see `LiquidRuntimeError`) render as `internal`. Errors are collected in `RenderOptions.errors`. Resource limits still throw. Defaults to `false`. */
   inlineErrors?: boolean;
   /** With `inlineErrors`, render nothing for errors from tags whose content is blank (whitespace, `assign`, `capture` and comments), like Shopify/liquid's `lax` and `strict` error modes. Defaults to `false`. */
@@ -180,6 +182,7 @@ export interface NormalizedFullOptions extends NormalizedOptions {
   operators: Operators;
   groupedExpressions: boolean;
   rawTags: string[];
+  rubyNumbers: boolean;
   inlineErrors: boolean;
   suppressBlankTagErrors: boolean;
   formatError: (error: InlineError) => string;
@@ -221,6 +224,7 @@ export const defaultOptions: NormalizedFullOptions = {
   operators: defaultOperators,
   groupedExpressions: false,
   rawTags: ['raw'],
+  rubyNumbers: false,
   inlineErrors: false,
   suppressBlankTagErrors: false,
   formatError: formatInlineError,

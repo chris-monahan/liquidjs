@@ -23,7 +23,7 @@ In the meantime, it's now implemented in JavaScript, that means it has to be mor
 Though we're trying to be compatible with the Ruby version, there are still some differences:
 
 * Truthy and Falsy. All values except `undefined`, `null`, `false` are truthy, whereas in Ruby Liquid all except `nil` and `false` are truthy. See [#26][#26].
-* Number. In JavaScript we cannot distinguish or convert between `float` and `integer`, see [#59][#59]. And when applied `size` filter, numbers always return 0, which is 8 for integer in ruby, cause they do not have a `length` property.
+* Number. In JavaScript we cannot distinguish or convert between `float` and `integer`, see [#59][#59]. The [rubyNumbers][ruby-numbers] option follows Ruby's number semantics instead. And when applied `size` filter, numbers always return 0, which is 8 for integer in ruby, cause they do not have a `length` property.
 * Stringify: We've aligned string coercion for primitive types. While some differences remain; for example, in Shopify/liquid, `strip` returns the "inspected" string of an input array, whereas in LiquidJS, the `strip` filter simply stringifies the input array [#852][#852].
 * [.to_liquid()](https://github.com/Shopify/liquid/wiki/Introduction-to-Drops) is replaced by `.toLiquid()`
 * [.to_s()](https://www.rubydoc.info/gems/liquid/Liquid/Drop) is replaced by JavaScript `.toString()`
@@ -38,6 +38,7 @@ Though we're trying to be compatible with the Ruby version, there are still some
 * Some tags/filters behave differently: [date][date] filter, malformed tags (like duplicated `else`, extra args for `endif`) throw errors in LiquidJS. 
 
 [date]: https://liquidjs.com/filters/date.html
+[ruby-numbers]: ./options.html#Ruby-Numbers
 [layout]: ../tags/layout.html
 [render]: ../tags/render.html
 [json]: https://liquidjs.com/filters/json.html
