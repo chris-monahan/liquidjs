@@ -11,6 +11,8 @@ export abstract class LiquidError extends Error {
   public token!: Token
   public context = ''
   public originalError?: Error
+  /** The message without location information */
+  public rawMessage!: string
   public constructor (err: Error | string, token: Token) {
     /**
      * note: for ES5 targeting, `this` will be replaced by return value of Error(),
@@ -22,6 +24,7 @@ export abstract class LiquidError extends Error {
     Object.defineProperty(this, TRAIT, { value: 'LiquidError', enumerable: false })
   }
   protected update () {
+    Object.defineProperty(this, 'rawMessage', { value: this.message, enumerable: false })
     Object.defineProperty(this, 'context', { value: mkContext(this.token), enumerable: false })
     this.message = mkMessage(this.message, this.token)
     this.stack = this.message + '\n' + this.context +
@@ -101,6 +104,22 @@ export class AssertionError extends Error {
     super(message)
     this.name = 'AssertionError'
     this.message = message + ''
+  }
+}
+
+/** Thrown when a render, memory or parse limit is exceeded; never rendered inline. */
+export class ResourceLimitError extends AssertionError {
+  public constructor (message: string) {
+    super(message)
+    this.name = 'ResourceLimitError'
+  }
+}
+
+/** An error whose message `inlineErrors` renders, like Shopify/liquid's `Liquid::Error`. Throw it from filters and tags. */
+export class LiquidRuntimeError extends Error {
+  public constructor (message: string) {
+    super(message)
+    this.name = 'LiquidRuntimeError'
   }
 }
 

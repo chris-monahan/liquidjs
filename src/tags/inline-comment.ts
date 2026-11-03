@@ -1,6 +1,7 @@
 import { TagToken, Liquid, TopLevelToken, Tag } from '..'
 
 export default class extends Tag {
+  readonly blank = true
   constructor (tagToken: TagToken, remainTokens: TopLevelToken[], liquid: Liquid) {
     super(tagToken, remainTokens, liquid)
     if (tagToken.args.search(/\n\s*[^#\s]/g) !== -1) {

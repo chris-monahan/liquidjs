@@ -1,7 +1,9 @@
+import { isBlank } from '../template'
 import { Template, Emitter, Liquid, TopLevelToken, TagToken, Context, Tag } from '..'
 import { Parser } from '../parser'
 
 export default class extends Tag {
+  get blank () { return isBlank(this.templates) }
   templates: Template[]
   constructor (token: TagToken, remainTokens: TopLevelToken[], liquid: Liquid, parser: Parser) {
     super(token, remainTokens, liquid)

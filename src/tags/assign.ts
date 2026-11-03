@@ -3,6 +3,7 @@ import { Arguments } from '../template'
 import { IdentifierToken } from '../tokens'
 
 export default class extends Tag {
+  readonly blank = true
   private key: string
   private value: Value
   private identifier: IdentifierToken

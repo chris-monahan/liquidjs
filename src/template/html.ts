@@ -9,6 +9,10 @@ export class HTML extends TemplateImpl<HTMLToken> implements Template {
     super(token)
     this.str = token.getContent()
   }
+  public get blank () {
+    return /^\s*$/.test(this.str)
+  }
+
   public * render (ctx: Context, emitter: Emitter): IterableIterator<void> {
     emitter.write(this.str)
   }

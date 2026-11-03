@@ -3,6 +3,7 @@ import { toPromise, RenderError, LiquidErrors, LiquidError } from '../util'
 import { Context } from '../context'
 import { Template } from '../template'
 import { Emitter, KeepingTypeEmitter, StreamedEmitter, SimpleEmitter } from '../emitters'
+import { describeError, isFatal, isSilent } from './inline-error'
 
 export class Render {
   public renderTemplatesToNodeStream (templates: Template[], ctx: Context): NodeJS.ReadableStream {
@@ -27,7 +28,12 @@ export class Render {
         if (ctx.breakCalled || ctx.continueCalled) break
       } catch (e) {
         const err = LiquidError.is(e) ? e : new RenderError(e as Error, tpl)
-        if (ctx.opts.catchAllErrors) errors.push(err)
+        if (ctx.opts.inlineErrors && !isFatal(err)) {
+          ctx.errors.push(err)
+          const suppressed = isSilent(err) || (ctx.opts.suppressBlankTagErrors && tpl.blank)
+          if (!suppressed) emitter.write(ctx.opts.formatError(describeError(err)))
+          if (ctx.breakCalled || ctx.continueCalled) break
+        } else if (ctx.opts.catchAllErrors) errors.push(err)
         else throw err
       }
     }

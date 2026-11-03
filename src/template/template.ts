@@ -33,9 +33,16 @@ export interface PartialScope {
 export interface Template {
   token: Token;
   render(ctx: Context, emitter: Emitter): any;
+  /** Renders only whitespace: `assign`, `capture`, comments, or blocks of those, like Shopify/liquid's `blank?` */
+  readonly blank?: boolean;
   children?(partials: boolean, sync: boolean): Generator<unknown, Template[]> ;
   arguments?(): Arguments;
   blockScope?(): Iterable<string>;
   localScope?(): Iterable<IdentifierToken | QuotedToken>;
   partialScope?(): PartialScope | undefined;
+}
+
+export function isBlank (templates: Iterable<Template> | undefined): boolean {
+  for (const t of templates ?? []) if (!t.blank) return false
+  return true
 }

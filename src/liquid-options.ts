@@ -7,6 +7,8 @@ import { defaultOperators, Operators } from './render'
 import misc from './filters/misc'
 import { escape } from './filters/html'
 import { MapFS } from './fs/map-fs'
+import { formatInlineError, type InlineError } from './render/inline-error'
+import type { LiquidError } from './util/error'
 
 type OutputEscape = (value: any) => string
 type OutputEscapeOption = 'escape' | 'json' | OutputEscape
@@ -89,6 +91,12 @@ export interface LiquidOptions {
   orderedFilterParameters?: boolean;
   /** Allow parenthesized expressions as operands in conditions and loops, e.g. `{% if (foo | upcase) == "BAR" %}`. This is a non-standard extension to Liquid. Defaults to `false`. */
   groupedExpressions?: boolean;
+  /** Render each failing tag or output as an error message in place, and continue rendering, like Shopify/liquid's `Template#render`. Errors other than Liquid errors (see `LiquidRuntimeError`) render as `internal`. Errors are collected in `RenderOptions.errors`. Resource limits still throw. Defaults to `false`. */
+  inlineErrors?: boolean;
+  /** With `inlineErrors`, render nothing for errors from tags whose content is blank (whitespace, `assign`, `capture` and comments), like Shopify/liquid's `lax` and `strict` error modes. Defaults to `false`. */
+  suppressBlankTagErrors?: boolean;
+  /** With `inlineErrors`, format an error as output. Defaults to `formatInlineError`: `Liquid error (line 3): divided by 0`. */
+  formatError?: (error: InlineError) => string;
   /** For DoS handling, limit total length of templates parsed in one `parse()` call. A typical PC can handle 1e8 (100M) characters without issues. */
   parseLimit?: number;
   /** For DoS handling, limit total time (in ms) for each `render()` call. */
@@ -98,6 +106,10 @@ export interface LiquidOptions {
 }
 
 export interface RenderOptions {
+  /**
+   * Collects errors caught by `inlineErrors`, including those from partials.
+   */
+  errors?: LiquidError[];
   /**
    * This call is sync or async? It's used by Liquid internal methods, you'll not need this.
    */
@@ -165,6 +177,9 @@ export interface NormalizedFullOptions extends NormalizedOptions {
   keepOutputType: boolean;
   operators: Operators;
   groupedExpressions: boolean;
+  inlineErrors: boolean;
+  suppressBlankTagErrors: boolean;
+  formatError: (error: InlineError) => string;
   parseLimit: number;
   renderLimit: number;
   memoryLimit: number;
@@ -202,6 +217,9 @@ export const defaultOptions: NormalizedFullOptions = {
   keepOutputType: false,
   operators: defaultOperators,
   groupedExpressions: false,
+  inlineErrors: false,
+  suppressBlankTagErrors: false,
+  formatError: formatInlineError,
   memoryLimit: Infinity,
   parseLimit: Infinity,
   renderLimit: Infinity

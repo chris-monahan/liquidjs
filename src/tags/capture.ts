@@ -4,6 +4,7 @@ import { IdentifierToken, QuotedToken } from '../tokens'
 import { isTagToken } from '../util'
 
 export default class extends Tag {
+  readonly blank = true
   identifier: IdentifierToken | QuotedToken
   variable: string
   templates: Template[] = []
