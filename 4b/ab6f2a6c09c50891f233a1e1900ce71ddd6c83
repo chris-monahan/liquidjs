@@ -1,0 +1,44 @@
+src/context/context.ts
+  h_f60b77838d081d 2,152,154-158
+src/drop/empty-drop.ts
+  h_f60b77838d081d 4,11
+src/filters/array.ts
+  h_f60b77838d081d 9,23,30,53,63,72,78-79,89,97,105,135,149,178,192,206,215,255
+src/filters/string.ts
+  h_f60b77838d081d 227
+src/render/expression.spec.ts
+  h_f60b77838d081d 5,224-225,228-229,232-234
+src/render/expression.ts
+  h_f60b77838d081d 8-9,104-118,120-122
+src/render/operator.ts
+  h_f60b77838d081d 6,46
+src/tags/for.ts
+  h_f60b77838d081d 4
+src/tags/render.ts
+  h_f60b77838d081d 4
+src/tags/tablerow.ts
+  h_f60b77838d081d 2-3,44-46
+src/util/index.ts
+  h_f60b77838d081d 11
+src/util/liquid-range.ts
+  h_f60b77838d081d 1-55
+src/util/underscore.ts
+  h_f60b77838d081d 2-3,65,69-72,78,82-85
+test/integration/liquid/range.spec.ts
+  h_f60b77838d081d 1-135
+test/integration/tags/assign.spec.ts
+  h_f60b77838d081d 26,29,108
+test/integration/tags/if.spec.ts
+  h_f60b77838d081d 1,210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4bab6f2a6c09c50891f233a1e1900ce71ddd6c83",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
