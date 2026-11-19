@@ -1,0 +1,20 @@
+docs/source/tags/render.md
+  h_f60b77838d081d 81,92
+src/tags/layout.ts
+  h_f60b77838d081d 16
+src/tags/render.ts
+  h_f60b77838d081d 2-4,10,16-17,24-27,32-33,35-52,55-67,70,87,92,122-173,175,180,184,194,206
+test/integration/tags/render.spec.ts
+  h_f60b77838d081d 186-246
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7dfb637e923a76bb8b3b2be8eebe0f2e52430c6e",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
