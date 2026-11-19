@@ -8,6 +8,7 @@ import RenderTag from './render'
 import DecrementTag from './decrement'
 import CycleTag from './cycle'
 import IfTag from './if'
+import IfchangedTag from './ifchanged'
 import IncrementTag from './increment'
 import LayoutTag from './layout'
 import BlockTag from './block'
@@ -33,6 +34,7 @@ export const tags: Record<string, TagClass> = {
   increment: IncrementTag,
   cycle: CycleTag,
   'if': IfTag,
+  ifchanged: IfchangedTag,
   layout: LayoutTag,
   block: BlockTag,
   raw: RawTag,
@@ -45,4 +47,4 @@ export const tags: Record<string, TagClass> = {
   '#': InlineCommentTag
 }
 
-export { AssignTag, ForTag, CaptureTag, CaseTag, CommentTag, IncludeTag, RenderTag, DecrementTag, IncrementTag, CycleTag, IfTag, LayoutTag, BlockTag, RawTag, TablerowTag, UnlessTag, BreakTag, ContinueTag, EchoTag, LiquidTag, InlineCommentTag }
+export { AssignTag, ForTag, CaptureTag, CaseTag, CommentTag, IncludeTag, RenderTag, DecrementTag, IncrementTag, CycleTag, IfTag, IfchangedTag, LayoutTag, BlockTag, RawTag, TablerowTag, UnlessTag, BreakTag, ContinueTag, EchoTag, LiquidTag, InlineCommentTag }

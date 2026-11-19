@@ -127,6 +127,7 @@ tags:
   elsif: if.html
   for: for.html
   if: if.html
+  ifchanged: ifchanged.html
   include: include.html
   increment: increment.html
   layout: layout.html
