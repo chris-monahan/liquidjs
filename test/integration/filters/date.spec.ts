@@ -13,6 +13,10 @@ describe('filters/date', function () {
     it('should create a new Date when given "today"', function () {
       return test('{{ "today" | date: "%Y"}}', (new Date()).getFullYear().toString())
     })
+    it('should match "now" and "today" case-insensitively and return input on empty format', async function () {
+      await test('{{ "Today" | date: "%Y"}}', (new Date()).getFullYear().toString())
+      await test('{{ "2020-06-15 14:30:45" | date: "" }}', '2020-06-15 14:30:45')
+    })
     it('should create from number', async function () {
       const time = new Date('2017-03-07T12:00:00').getTime() / 1000
       return test('{{ time | date: "%Y-%m-%dT%H:%M:%S" }}', { time }, '2017-03-07T12:00:00')

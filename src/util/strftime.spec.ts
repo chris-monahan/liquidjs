@@ -172,6 +172,12 @@ describe('util/strftime', function () {
       expect(t(new TestDate('2006-07-05 12:00:00'), '%U %W')).toBe('27 27')
       expect(t(new TestDate('2007-01-01 12:00:00'), '%U %W')).toBe('00 01')
     })
+    it('should format %V, %G, %g for ISO 8601 week dates and %D, %F, %R, %T, %r', function () {
+      expect(t(new TestDate('2020-01-01 12:00:00'), '%G|%g|%V')).toBe('2020|20|01')
+      expect(t(new TestDate('2019-12-30 12:00:00'), '%G|%g|%V')).toBe('2020|20|01')
+      expect(t(new TestDate('2016-01-01 12:00:00'), '%G|%g|%V')).toBe('2015|15|53')
+      expect(t(new TestDate('2020-06-15 14:30:45'), '%D|%F|%R|%T|%r')).toBe('06/15/20|2020-06-15|14:30|14:30:45|02:30:45 PM')
+    })
   })
 
   describe('Time zone', () => {

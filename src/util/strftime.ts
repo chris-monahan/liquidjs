@@ -45,12 +45,27 @@ function ordinal (d: LiquidDate) {
 function century (d: LiquidDate) {
   return Math.floor(d.getFullYear() / 100)
 }
+function getIsoWeekDate (d: LiquidDate): { year: number, week: number } {
+  const utc = new Date(0)
+  utc.setUTCFullYear(d.getFullYear(), d.getMonth(), d.getDate())
+  utc.setUTCHours(0, 0, 0, 0)
+  const isoDow = utc.getUTCDay() || 7
+  utc.setUTCDate(utc.getUTCDate() + 4 - isoDow)
+  const isoYear = utc.getUTCFullYear()
+  const jan1 = new Date(0)
+  jan1.setUTCFullYear(isoYear, 0, 1)
+  jan1.setUTCHours(0, 0, 0, 0)
+  const isoWeek = Math.floor((utc.getTime() - jan1.getTime()) / 86400000 / 7) + 1
+  return { year: isoYear, week: isoWeek }
+}
 
 // default to 0
 const padWidths: Record<string, number> = {
   C: 2,
   d: 2,
   e: 2,
+  g: 2,
+  G: 4,
   H: 2,
   I: 2,
   j: 3,
@@ -61,6 +76,7 @@ const padWidths: Record<string, number> = {
   M: 2,
   S: 2,
   U: 2,
+  V: 2,
   W: 2,
   y: 2,
   Y: 4
@@ -87,7 +103,11 @@ const formatCodes: Record<string, FormatCodeHandler> = {
   c: (d: LiquidDate) => d.toLocaleString(),
   C: (d: LiquidDate) => century(d),
   d: (d: LiquidDate) => d.getDate(),
+  D: (d: LiquidDate, opts: FormatOptions) => strftime(d, '%m/%d/%y', opts.memoryLimit),
   e: (d: LiquidDate) => d.getDate(),
+  F: (d: LiquidDate, opts: FormatOptions) => strftime(d, '%Y-%m-%d', opts.memoryLimit),
+  g: (d: LiquidDate) => (getIsoWeekDate(d).year % 100 + 100) % 100,
+  G: (d: LiquidDate) => getIsoWeekDate(d).year,
   H: (d: LiquidDate) => d.getHours(),
   I: (d: LiquidDate) => String(d.getHours() % 12 || 12),
   j: (d: LiquidDate) => getDayOfYear(d),
@@ -105,10 +125,15 @@ const formatCodes: Record<string, FormatCodeHandler> = {
   p: (d: LiquidDate) => (d.getHours() < 12 ? 'AM' : 'PM'),
   P: (d: LiquidDate) => (d.getHours() < 12 ? 'am' : 'pm'),
   q: (d: LiquidDate) => ordinal(d),
+  r: (d: LiquidDate, opts: FormatOptions) => strftime(d, '%I:%M:%S %p', opts.memoryLimit),
+  R: (d: LiquidDate, opts: FormatOptions) => strftime(d, '%H:%M', opts.memoryLimit),
   s: (d: LiquidDate) => Math.floor(d.dateValue() / 1000),
   S: (d: LiquidDate) => d.getSeconds(),
+  T: (d: LiquidDate, opts: FormatOptions) => strftime(d, '%H:%M:%S', opts.memoryLimit),
   u: (d: LiquidDate) => d.getDay() || 7,
   U: (d: LiquidDate) => getWeekOfYear(d, 0),
+  v: (d: LiquidDate, opts: FormatOptions) => strftime(d, '%e-%^b-%4Y', opts.memoryLimit),
+  V: (d: LiquidDate) => getIsoWeekDate(d).week,
   w: (d: LiquidDate) => d.getDay(),
   W: (d: LiquidDate) => getWeekOfYear(d, 1),
   x: (d: LiquidDate) => d.toLocaleDateString(),
