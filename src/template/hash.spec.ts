@@ -50,4 +50,12 @@ describe('Hash', function () {
     expect(hash.a).toBe(1)
     expect(hash.b).toBe(2)
   })
+  it('should evaluate entries sequentially into a pushed scope', async function () {
+    const ctx = new Context({ b: 99 })
+    const scope: Record<string, any> = {}
+    ctx.push(scope)
+    const hash = await toPromise(new Hash('a: 1, b: a').render(ctx, scope))
+    expect(hash).toBe(scope)
+    expect(scope).toEqual({ a: 1, b: 1 })
+  })
 })

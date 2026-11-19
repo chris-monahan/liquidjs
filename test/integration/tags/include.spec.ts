@@ -60,8 +60,16 @@ describe('tags/include', function () {
     })
     return liquid.renderFile('/parent.html').catch(function (e) {
       expect(e.name).toBe('RenderError')
-      expect(e.message).toMatch(/illegal file path "undefined"/)
+      expect(e.message).toMatch(/Argument error in tag 'include' - Illegal template name/)
     })
+  })
+
+  it('should throw illegal template name for non-string names and pass empty string to lookup', async function () {
+    mock({})
+    await expect(liquid.parseAndRender('{% include nil %}')).rejects.toThrow("Argument error in tag 'include' - Illegal template name")
+    await expect(liquid.parseAndRender('{% include 123 %}')).rejects.toThrow("Argument error in tag 'include' - Illegal template name")
+    await expect(liquid.parseAndRender('{% include true %}')).rejects.toThrow("Argument error in tag 'include' - Illegal template name")
+    await expect(liquid.parseAndRender('{% include "" %}')).rejects.toThrow(/Failed to lookup ""/)
   })
 
   it('should support include with relative path', async function () {
@@ -98,6 +106,59 @@ describe('tags/include', function () {
     })
     const html = await liquid.renderFile('with.html')
     return expect(html).toBe('color:red, shape:rect')
+  })
+  it('should support include: with...as and partial basename default', async function () {
+    mock({
+      '/item.html': '[{{ thing }}]',
+      '/snippets/card.html': '[{{ card }}]'
+    })
+    expect(await liquid.parseAndRender("{% include 'item' with featured as thing %}", { featured: 'F' })).toBe('[F]')
+    expect(await liquid.parseAndRender("{% include 'snippets/card' with featured %}", { featured: 'C' })).toBe('[C]')
+  })
+  it('should support include: for and for...as without creating forloop', async function () {
+    mock({
+      '/item.html': '[{{ item }}:{{ forloop.index }}]',
+      '/aliased.html': '[{{ thing }}:{{ forloop.index }}]'
+    })
+    expect(await liquid.parseAndRender("{% include 'item' for items %}", { items: ['a', 'b'] })).toBe('[a:][b:]')
+    expect(await liquid.parseAndRender("{% include 'aliased' for items as thing %}", { items: ['a', 'b'] })).toBe('[a:][b:]')
+    expect(await liquid.parseAndRender("{% include 'item' for empty_items %}", { empty_items: [] })).toBe('')
+    expect(await liquid.parseAndRender("{% for x in (1..2) %}{% include 'item' for items %}{% endfor %}", { items: ['a', 'b'] })).toBe('[a:1][b:1][a:2][b:2]')
+  })
+  it('should share assign scope across include for iterations and propagate break/continue to outer for', async function () {
+    mock({
+      '/acc.html': '{% assign count = count | default: 0 | plus: 1 %}{{ count }}:{{ acc }};',
+      '/brk.html': '[{{ brk }}]{% if brk == 2 %}{% break %}{% endif %}',
+      '/cnt.html': '[{{ cnt }}]{% if cnt == 2 %}{% continue %}{% endif %}'
+    })
+    expect(await liquid.parseAndRender("{% include 'acc' for items %}{{ count }}", { items: ['a', 'b'] })).toBe('1:a;2:b;2')
+    expect(await liquid.parseAndRender("{% for x in (1..2) %}({{ x }}:{% include 'brk' for items %}!){% endfor %}", { items: [1, 2, 3] })).toBe('(1:[1][2]')
+    expect(await liquid.parseAndRender("{% for x in (1..2) %}({{ x }}:{% include 'cnt' for items %}!){% endfor %}", { items: [1, 2, 3] })).toBe('(1:[1][2](2:[1][2]')
+  })
+  it('should iterate arrays in with and not iterate non-arrays in for', async function () {
+    mock({
+      '/item.html': '[{{ item }}]'
+    })
+    expect(await liquid.parseAndRender("{% include 'item' with items %}", { items: ['a', 'b'] })).toBe('[a][b]')
+    expect(await liquid.parseAndRender("{% include 'item' for (1..3) %}")).toBe('[123]')
+    expect(await liquid.parseAndRender("{% include 'item' for 'abc' %}")).toBe('[abc]')
+  })
+  it('should evaluate keyword arguments sequentially in included scope', async function () {
+    mock({
+      '/item.html': '{{ a }}{{ b }}',
+      '/with_item.html': '{{ item }}-{{ a }}-{{ b }}'
+    })
+    expect(await liquid.parseAndRender("{% include 'item' a: 1, b: a %}")).toBe('11')
+    expect(await liquid.parseAndRender("{% include 'with_item' with b as item, a: 1, b: a %}", { b: 'outer' })).toBe('outer-1-1')
+  })
+  it('should disallow include inside render while allowing sibling include', async function () {
+    mock({
+      '/rendered.html': "{% include 'sub' %}",
+      '/ok.html': 'R',
+      '/sub.html': 'I'
+    })
+    await expect(liquid.parseAndRender("{% render 'rendered' %}")).rejects.toThrow('include usage is not allowed in this context')
+    expect(await liquid.parseAndRender("{% render 'ok' %}-{% include 'sub' %}")).toBe('R-I')
   })
   it('should ignore if with value not specified', async function () {
     mock({
