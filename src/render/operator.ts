@@ -3,6 +3,7 @@ import { Context } from '../context'
 import { toValue } from '../util'
 import { isFalsy, isTruthy } from '../render/boolean'
 import { isArray, isFunction } from '../util/underscore'
+import { LiquidRange } from '../util/liquid-range'
 
 /**
  * A handler may return a `boolean` (legacy interface), a `Promise`, or a generator
@@ -42,6 +43,7 @@ export const defaultOperators: Operators = {
   'contains': function * (l: any, r: any): OperatorGenerator {
     l = yield toValue(l)
     if (isArray(l)) return yield arrayIncludes(l, r)
+    if (l instanceof LiquidRange) return l.includes(yield toValue(r))
     if (isFunction(l?.indexOf)) return l.indexOf(yield toValue(r)) > -1
     return false
   },

@@ -1,4 +1,6 @@
 import { Drop } from '../drop/drop'
+import type { Limiter } from './limiter'
+import { LiquidRange } from './liquid-range'
 
 export const toString = Object.prototype.toString
 const toLowerCase = String.prototype.toLowerCase
@@ -60,19 +62,27 @@ export function readArrayElement (arr: any[], index: number, ownPropertyOnly: bo
   return arr[index]
 }
 
-export function toEnumerable<T = unknown> (val: any): T[] {
+export function toEnumerable<T = unknown> (val: any, limiter?: Limiter): T[] {
   val = toValue(val)
   if (isArray(val)) return val
   if (isString(val) && val.length > 0) return [val] as unknown as T[]
+  if (val instanceof LiquidRange) {
+    limiter?.use(val.length)
+    return val.toArray() as unknown as T[]
+  }
   if (isIterable(val)) return Array.from(val)
   if (isObject(val)) return Object.keys(val).map((key) => [key, val[key]]) as unknown as T[]
   return []
 }
 
-export function toArray (val: any) {
+export function toArray (val: any, limiter?: Limiter) {
   val = toValue(val)
   if (isNil(val)) return []
   if (isArray(val)) return val
+  if (val instanceof LiquidRange) {
+    limiter?.use(val.length)
+    return val.toArray()
+  }
   return [ val ]
 }
 
@@ -159,6 +169,7 @@ export function isPlainObject (value: any): value is Record<string, any> {
 }
 
 export function readFirst (v: any, ownPropertyOnly: boolean) {
+  if (v instanceof LiquidRange) return v.start
   if (isString(v)) return v.length === 0 ? '' : v.slice(0, advanceCodePoints(v, 0, 1))
   if (isArray(v)) return readArrayElement(v, 0, ownPropertyOnly)
   if (isIterable(v)) {
@@ -172,6 +183,7 @@ export function readFirst (v: any, ownPropertyOnly: boolean) {
 }
 
 export function readLast (v: any, ownPropertyOnly: boolean) {
+  if (v instanceof LiquidRange) return v.stop
   if (isString(v)) {
     if (v.length === 0) return ''
     const lastCode = v.charCodeAt(v.length - 1)

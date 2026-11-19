@@ -1,10 +1,12 @@
 import { QuotedToken, RangeToken, OperatorToken, Token, PropertyAccessToken, OperatorType, operatorTypes, FilteredValueToken } from '../tokens'
-import { isRangeToken, isPropertyAccessToken, isFilteredValueToken, isNumberToken, UndefinedVariableError, range, isOperatorToken, assert, toValue } from '../util'
+import { isRangeToken, isPropertyAccessToken, isFilteredValueToken, isNumberToken, UndefinedVariableError, isOperatorToken, assert, toValue } from '../util'
 import type { Context } from '../context'
 import type { UnaryOperatorHandler } from '../render'
 import { Drop } from '../drop'
 import { Filter } from '../template/filter'
 import { IdentifierToken } from '../tokens/identifier-token'
+import type { ValueToken } from '../tokens'
+import { LiquidRange } from '../util/liquid-range'
 
 export class Expression {
   readonly postfix: Token[]
@@ -99,11 +101,25 @@ export function evalQuotedToken (token: QuotedToken) {
   return token.content
 }
 
+function coerceRangeBound (token: ValueToken, val: unknown): number {
+  if (isNumberToken(token)) return Math.trunc(Number(token.content)) || 0
+  if (val == null) return 0
+  if (typeof val === 'number') {
+    assert(Number.isInteger(val), 'invalid integer')
+    return val || 0
+  }
+  if (typeof val === 'string') {
+    const m = /^\s*[+-]?\d+/.exec(val)
+    return m ? (Number(m[0]) || 0) : 0
+  }
+  assert(false, 'invalid integer')
+  return 0
+}
+
 function * evalRangeToken (token: RangeToken, ctx: Context): IterableIterator<unknown> {
-  const low = (yield evalTokenValue(token.lhs, ctx)) as unknown as number
-  const high = (yield evalTokenValue(token.rhs, ctx)) as unknown as number
-  ctx.memoryLimit.use(high - low + 1)
-  return range(+low, +high + 1)
+  const low = coerceRangeBound(token.lhs, yield evalTokenValue(token.lhs, ctx))
+  const high = coerceRangeBound(token.rhs, yield evalTokenValue(token.rhs, ctx))
+  return new LiquidRange(low, high)
 }
 
 function * toPostfix (tokens: Iterable<Token>): IterableIterator<Token> {

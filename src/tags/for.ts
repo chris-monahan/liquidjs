@@ -1,6 +1,7 @@
 import { isBlank, Arguments } from '../template'
 import { Drop, Hash, ValueToken, Liquid, Tag, evalToken, evalTokenValue, Emitter, TagToken, TopLevelToken, Context, Template, ParseStream, FilteredValueToken } from '..'
 import { assertEmpty, isNil, isString, isValueToken, toEnumerable, toInteger, toValue } from '../util'
+import { LiquidRange } from '../util/liquid-range'
 import { createScope } from '../context/scope'
 import { ForloopDrop } from '../drop/forloop-drop'
 import { Parser } from '../parser'
@@ -68,7 +69,9 @@ export default class extends Tag {
     if (isString(unwrapped)) {
       collection = unwrapped.length > 0 ? [unwrapped] : []
     } else {
-      collection = toEnumerable(rawVal instanceof Drop ? yield toValue(rawVal) : rawVal)
+      const resolved = rawVal instanceof Drop ? yield toValue(rawVal) : rawVal
+      if (resolved instanceof LiquidRange) ctx.memoryLimit.use(resolved.length)
+      collection = toEnumerable(resolved)
       if (this.liquid.options.orderedFilterParameters) {
         for (const key of Object.keys(this.hash.hash)) {
           if (key === 'offset') {

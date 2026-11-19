@@ -1,4 +1,5 @@
 import { codePointLength, readFirst, readLast, readSize } from '../util/underscore'
+import { LiquidRange } from '../util/liquid-range'
 import { getPerformance } from '../util/performance'
 import { Drop } from '../drop/drop'
 import { __assign } from 'tslib'
@@ -137,15 +138,24 @@ export class Context {
   }
   readProperty (obj: Scope, key: (PropertyKey | Drop), allowCommand = true) {
     obj = toLiquid(obj)
-    key = toValue(key) as PropertyKey
+    const rawKey = toValue(key)
     if (isNil(obj)) return obj
     if (obj instanceof LiquidFloat) return undefined
+    if (rawKey instanceof LiquidRange && !(obj instanceof Drop)) return undefined
+    key = rawKey as PropertyKey
     if (isArray(obj) && isNumber(key)) return readArrayElement(obj, key, this.ownPropertyOnly)
     if (isString(obj)) {
       if (!allowCommand) return undefined
       if (key === 'first') return readFirst(obj, this.ownPropertyOnly)
       if (key === 'last') return readLast(obj, this.ownPropertyOnly)
       if (key === 'size' || key === 'length') return codePointLength(obj)
+      return undefined
+    }
+    if (obj instanceof LiquidRange) {
+      if (!allowCommand) return undefined
+      if (key === 'first') return obj.start
+      if (key === 'last') return obj.stop
+      if (key === 'size') return obj.length
       return undefined
     }
     const value = readJSProperty(obj, key, this.ownPropertyOnly)

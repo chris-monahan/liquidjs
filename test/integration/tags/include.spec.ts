@@ -140,7 +140,7 @@ describe('tags/include', function () {
       '/item.html': '[{{ item }}]'
     })
     expect(await liquid.parseAndRender("{% include 'item' with items %}", { items: ['a', 'b'] })).toBe('[a][b]')
-    expect(await liquid.parseAndRender("{% include 'item' for (1..3) %}")).toBe('[123]')
+    expect(await liquid.parseAndRender("{% include 'item' for (1..3) %}")).toBe('[1..3]')
     expect(await liquid.parseAndRender("{% include 'item' for 'abc' %}")).toBe('[abc]')
   })
   it('should evaluate keyword arguments sequentially in included scope', async function () {

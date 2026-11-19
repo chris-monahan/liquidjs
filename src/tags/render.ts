@@ -1,6 +1,7 @@
 import { __assign } from 'tslib'
 import { Drop, ForloopDrop, NullDrop } from '../drop'
 import { isArray, isIterable, isNil, isObject, isString, isValueToken, toValue } from '../util'
+import { LiquidRange } from '../util/liquid-range'
 import { TopLevelToken, assert, Liquid, Token, ValueToken, Template, evalQuotedToken, TypeGuards, Tokenizer, evalToken, evalTokenValue, Hash, Emitter, TagToken, Context, Tag } from '..'
 import { Parser } from '../parser'
 import { Argument, Arguments, PartialScope } from '../template'
@@ -55,6 +56,7 @@ export default class extends Tag {
     if (forBinding) {
       const raw = yield evalToken(forBinding.value, ctx)
       const unwrapped = raw instanceof Drop ? yield toValue(raw) : toValue(raw)
+      if (unwrapped instanceof LiquidRange) ctx.memoryLimit.use(unwrapped.length)
       const list = toRenderForList(unwrapped)
       if (list !== undefined) {
         const forloop = new ForloopDrop(list.length, forBinding.value.getText(), forBinding.alias || defaultAlias)
