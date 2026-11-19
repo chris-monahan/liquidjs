@@ -1,0 +1,20 @@
+src/parser/tokenizer.spec.ts
+  h_f60b77838d081d 1,54-79
+src/parser/tokenizer.ts
+  h_f60b77838d081d 3,323-326
+test/integration/drop/blank-drop.spec.ts
+  h_f60b77838d081d 2,52-74
+test/integration/drop/empty-drop.spec.ts
+  h_f60b77838d081d 91-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "391e6a3f4c85b4f24ca1f89bf0241351b008cc13",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
