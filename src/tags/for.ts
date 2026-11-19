@@ -1,13 +1,9 @@
 import { isBlank, Arguments } from '../template'
-import { Hash, ValueToken, Liquid, Tag, evalToken, Emitter, TagToken, TopLevelToken, Context, Template, ParseStream, FilteredValueToken } from '..'
-import { assertEmpty, isValueToken, toEnumerable } from '../util'
+import { Drop, Hash, ValueToken, Liquid, Tag, evalToken, evalTokenValue, Emitter, TagToken, TopLevelToken, Context, Template, ParseStream, FilteredValueToken } from '..'
+import { assertEmpty, isNil, isString, isValueToken, toEnumerable, toInteger, toValue } from '../util'
 import { createScope } from '../context/scope'
 import { ForloopDrop } from '../drop/forloop-drop'
 import { Parser } from '../parser'
-
-const MODIFIERS = ['offset', 'limit', 'reversed']
-
-type valueOf<T> = T[keyof T]
 
 export default class extends Tag {
   get blank () { return isBlank(this.templates) && isBlank(this.elseTemplates) }
@@ -42,31 +38,60 @@ export default class extends Tag {
 
     stream.start()
   }
-  * render (ctx: Context, emitter: Emitter): Generator<unknown, void | string, Template[]> {
+  * render (ctx: Context, emitter: Emitter): Generator<unknown, void | string, unknown> {
     const r = this.liquid.renderer
-    let collection = toEnumerable(yield evalToken(this.collection, ctx))
+    const offsets = ctx.getRegister('for', {} as Record<string, number>)
+    const offsetName = this.variable + '-' + this.collection.getText()
 
+    const offsetToken = this.hash.hash.offset
+    let from: number
+    if (offsetToken === undefined) {
+      from = 0
+    } else if (offsetToken.getText() === 'continue') {
+      from = offsets[offsetName] ?? 0
+    } else {
+      const v = yield evalTokenValue(offsetToken, ctx)
+      from = isNil(v) ? 0 : toInteger(v)
+    }
+
+    const rawVal = yield evalToken(this.collection, ctx)
+    const unwrapped = rawVal instanceof Drop ? rawVal : toValue(rawVal)
+
+    const limitToken = this.hash.hash.limit
+    let limitVal: number | undefined
+    if (limitToken !== undefined) {
+      const v = yield evalTokenValue(limitToken, ctx)
+      limitVal = isNil(v) ? undefined : toInteger(v)
+    }
+
+    let collection: unknown[]
+    if (isString(unwrapped)) {
+      collection = unwrapped.length > 0 ? [unwrapped] : []
+    } else {
+      collection = toEnumerable(rawVal instanceof Drop ? yield toValue(rawVal) : rawVal)
+      if (this.liquid.options.orderedFilterParameters) {
+        for (const key of Object.keys(this.hash.hash)) {
+          if (key === 'offset') {
+            if (offsetToken !== undefined) collection = sliceCollection(collection, from)
+          } else if (key === 'limit') {
+            if (limitVal !== undefined) collection = sliceCollection(collection, 0, limitVal)
+          } else if (key === 'reversed') {
+            collection = [...collection].reverse()
+          }
+        }
+      } else {
+        const to = limitVal === undefined ? undefined : from + limitVal
+        collection = sliceCollection(collection, from, to)
+        if ('reversed' in this.hash.hash) collection.reverse()
+      }
+    }
+
+    offsets[offsetName] = from + collection.length
     if (!collection.length) {
       yield r.renderTemplates(this.elseTemplates, ctx, emitter)
       return
     }
 
-    const continueKey = 'continue-' + this.variable + '-' + this.collection.getText()
-    ctx.push(createScope({ continue: ctx.getRegister(continueKey, {}) }))
-    const hash = (yield this.hash.render(ctx)) as Record<string, any>
-    ctx.pop()
-
-    const modifiers = this.liquid.options.orderedFilterParameters
-      ? Object.keys(hash).filter(x => MODIFIERS.includes(x))
-      : MODIFIERS.filter(x => hash[x] !== undefined)
-
-    collection = modifiers.reduce((collection, modifier: valueOf<typeof MODIFIERS>) => {
-      if (modifier === 'offset') return offset(collection, hash['offset'])
-      if (modifier === 'limit') return limit(collection, hash['limit'])
-      return reversed(collection)
-    }, collection)
-
-    ctx.setRegister(continueKey, (hash['offset'] || 0) + collection.length)
     const forStack: ForloopDrop[] = ctx.getRegister('forStack', [])
     const forloop = new ForloopDrop(collection.length, this.collection.getText(), this.variable, forStack[forStack.length - 1])
     const scope = createScope({ forloop })
@@ -98,7 +123,8 @@ export default class extends Tag {
   public * arguments (): Arguments {
     yield this.collection
 
-    for (const v of Object.values(this.hash.hash)) {
+    for (const [k, v] of Object.entries(this.hash.hash)) {
+      if (k === 'offset' && v?.getText() === 'continue') continue
       if (isValueToken(v)) {
         yield v
       }
@@ -110,14 +136,8 @@ export default class extends Tag {
   }
 }
 
-function reversed<T> (arr: Array<T>) {
-  return [...arr].reverse()
-}
-
-function offset<T> (arr: Array<T>, count: number) {
-  return arr.slice(count)
-}
-
-function limit<T> (arr: Array<T>, count: number) {
-  return arr.slice(0, count)
+function sliceCollection<T> (arr: T[], from: number, to?: number): T[] {
+  const start = Math.max(from, 0)
+  const finish = to === undefined ? arr.length : Math.min(to, arr.length)
+  return start < finish ? arr.slice(start, finish) : []
 }
