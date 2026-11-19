@@ -1,6 +1,7 @@
 import { Liquid } from '../../../src/liquid'
 import { Drop } from '../../../src/drop/drop'
 import { Scope } from '../../../src/context/scope'
+import { analyzeSync } from '../../../src/template/analysis'
 import { mock, restore } from '../../stub/mockfs'
 
 describe('tags/for', function () {
@@ -122,6 +123,17 @@ describe('tags/for', function () {
       const src = '{%for c in nullProtoObj%}a{%else%}b{%endfor%}'
       const html = await liquid.parseAndRender(src, scope)
       return expect(html).toBe('b')
+    })
+
+    it('should goto else when offset >= collection length or limit is 0', async function () {
+      expect(await liquid.parseAndRender('{% for i in (1..3) offset:3 %}{{ i }}{% else %}empty{% endfor %}')).toBe('empty')
+      expect(await liquid.parseAndRender('{% for i in (1..3) offset:5 %}{{ i }}{% else %}empty{% endfor %}')).toBe('empty')
+      expect(await liquid.parseAndRender('{% for i in (1..3) limit:0 %}{{ i }}{% else %}empty{% endfor %}')).toBe('empty')
+    })
+
+    it('should return single element for non-empty string and else for empty string regardless of offset/limit', async function () {
+      expect(await liquid.parseAndRender('{% for c in "abc" offset:2 limit:0 %}x{{ c }}{% else %}y{% endfor %}')).toBe('xabc')
+      expect(await liquid.parseAndRender('{% for c in "" offset:1 limit:2 %}x{{ c }}{% else %}y{% endfor %}')).toBe('y')
     })
   })
 
@@ -253,6 +265,19 @@ describe('tags/for', function () {
       return expect(liquid.parseAndRender(src, scope))
         .resolves.toBe('2 2 ')
     })
+    it('should render else when negative limit produces empty slice', async function () {
+      const src = '{% for i in (1..5) offset:2 limit:-1 %}{{ i }}{% else %}empty{% endfor %}'
+      const html = await liquid.parseAndRender(src, scope)
+      return expect(html).toBe('empty')
+    })
+    it('should ignore nil limit and reject invalid limit even when collection is empty', async function () {
+      expect(await liquid.parseAndRender('{% for i in (1..3) limit:nil %}{{ i }}{% endfor %}')).toBe('123')
+      await expect(liquid.parseAndRender("{% for i in emptyArray limit:'limit' %}{{ i }}{% endfor %}", scope))
+        .rejects.toThrow('invalid integer')
+      const inline = new Liquid({ inlineErrors: true })
+      expect(await inline.parseAndRender("{% for i in emptyArray limit:'limit' %}{{ i }}{% endfor %}", scope))
+        .toBe('Liquid error (line 1): invalid integer')
+    })
   })
 
   describe('offset', function () {
@@ -260,6 +285,12 @@ describe('tags/for', function () {
       const src = '{% for i in (1..10) limit:2 offset:5%}{{ i }}{% endfor %}'
       const html = await liquid.parseAndRender(src, scope)
       return expect(html).toBe('67')
+    })
+    it('should clamp negative offset and apply limit relative to negative offset', async function () {
+      expect(await liquid.parseAndRender('{% for i in a offset:-1 %}{{ i }}{% endfor %}', { a: [1, 2, 3, 4, 5] }))
+        .toBe('12345')
+      expect(await liquid.parseAndRender('{% for i in (1..5) offset:-2 limit:4 %}{{ i }}{% endfor %}'))
+        .toBe('12')
     })
     it('should set index properly', async function () {
       const src = '{%for i in (1..10) limit:2 offset:3%}{{forloop.index}} {%endfor%}'
@@ -291,6 +322,24 @@ describe('tags/for', function () {
       const html = await liquid.parseAndRender(src, { arr: [1, 2, 3, 4, 5] })
       return expect(html).toBe('12345-')
     })
+    it('should continue properly after negative offset and ignore continue variable in scope', async function () {
+      const src = '{% for i in arr offset:-2 limit:5 %}{{ i }}{% endfor %}-{% for i in arr offset:continue %}{{ i }}{% endfor %}'
+      const html = await liquid.parseAndRender(src, { arr: [1, 2, 3, 4, 5], continue: 99 })
+      return expect(html).toBe('123-2345')
+    })
+    it('should not report unquoted offset:continue as a variable in static analysis', function () {
+      const analysis = analyzeSync(liquid.parse('{% for i in arr offset: continue %}{{ i }}{% endfor %}'))
+      expect(Object.keys(analysis.variables)).toEqual(['arr', 'i'])
+      expect(Object.keys(analysis.globals)).toEqual(['arr'])
+    })
+    it('should reject quoted "continue" and invalid offsets even when collection is empty', async function () {
+      expect(await liquid.parseAndRender('{% for i in (1..3) offset:nil %}{{ i }}{% endfor %}')).toBe('123')
+      await expect(liquid.parseAndRender('{% for i in emptyArray offset: "continue" %}{{ i }}{% endfor %}', scope))
+        .rejects.toThrow('invalid integer')
+      const inline = new Liquid({ inlineErrors: true })
+      expect(await inline.parseAndRender('{% for i in emptyArray offset: "continue" %}{{ i }}{% endfor %}', scope))
+        .toBe('Liquid error (line 1): invalid integer')
+    })
     it('should treat different variable names as different forloop', async function () {
       const src = '{%for i in (1..5)%}{{i}}{%endfor%}-{%for j in (1..5) offset:continue%}{{j}}{%endfor%}'
       const html = await liquid.parseAndRender(src, {})
@@ -309,6 +358,13 @@ describe('tags/for', function () {
       const src = '{% for i in (1..8) limit:2 reversed %}{{ i }}{% endfor %}'
       const html = await liquid.parseAndRender(src, scope)
       return expect(html).toBe('21')
+    })
+
+    it('should support for reversed with negative offset and limit', async function () {
+      const a = [1, 2, 3]
+      const html = await liquid.parseAndRender('{% for i in a reversed offset:-1 limit:3 %}{{ i }}{% endfor %}', { a })
+      expect(html).toBe('21')
+      expect(a).toEqual([1, 2, 3])
     })
 
     it('should support for reversed in the first position', async function () {
