@@ -1,0 +1,18 @@
+src/drop/tablerowloop-drop.ts
+  h_f60b77838d081d 5-6,12-20,22,25,28,31,34
+src/tags/tablerow.ts
+  h_f60b77838d081d 2-3,9-77,113-115,117-118,120-121,123,128-142,144-146,148
+test/integration/tags/tablerow.spec.ts
+  h_f60b77838d081d 8,18,35,46-47,54,61,66,88-90,98-99,106,112,118,125,131,137,145,151,156-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d2a4698565f8430a46509c29bd9ab4cdeb944fcd",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
