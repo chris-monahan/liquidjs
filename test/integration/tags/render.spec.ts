@@ -183,6 +183,67 @@ describe('tags/render', function () {
     const html = await liquid.renderFile('index.html', { colors: ['red', 'green'] })
     expect(html).toBe('1: \n2: \n')
   })
+  it('should bind partial name for without as', async function () {
+    mock({
+      '/index.html': '{% render "item" for items %}',
+      '/item.html': '{{forloop.index}}: {{item}}\n'
+    })
+    const html = await liquid.renderFile('index.html', { items: ['red', 'green'] })
+    expect(html).toBe('1: red\n2: green\n')
+  })
+  it('should bind partial basename for subpath with and for', async function () {
+    mock({
+      '/with.html': '{% render "snippets/product-card" with product %}',
+      '/for.html': '{% render "snippets/product-card" for products %}',
+      '/snippets/product-card.html': '[{{ product-card }}]'
+    })
+    expect(await liquid.renderFile('with.html', { product: 'hat' })).toBe('[hat]')
+    expect(await liquid.renderFile('for.html', { products: ['hat', 'cap'] })).toBe('[hat][cap]')
+  })
+  it('should isolate subcontext per iteration in render for', async function () {
+    mock({
+      '/index.html': '{% render "item" for items %}',
+      '/item.html': '[{{ leaked }}-{{ item }}]{% assign leaked = "yes" %}'
+    })
+    const html = await liquid.renderFile('index.html', { items: ['a', 'b'] })
+    expect(html).toBe('[-a][-b]')
+  })
+  it('should set forloop.name to partial name in render for', async function () {
+    mock({
+      '/index.html': '{% render "snippets/item" for items as x %}',
+      '/snippets/item.html': '{{ forloop.name }}:{{ forloop.index }}:{{ x }};'
+    })
+    const html = await liquid.renderFile('index.html', { items: ['a', 'b'] })
+    expect(html).toBe('snippets/item:1:a;snippets/item:2:b;')
+  })
+  it('should not overwrite keyword argument when with or for value is nil, but bind false', async function () {
+    mock({
+      '/item.html': '[{{ item }}]'
+    })
+    expect(await liquid.parseAndRender('{% render "item" with nil, item: "fallback" %}')).toBe('[fallback]')
+    expect(await liquid.parseAndRender('{% render "item" with missing, item: "fallback" %}')).toBe('[fallback]')
+    expect(await liquid.parseAndRender('{% render "item" with false, item: "fallback" %}')).toBe('[false]')
+    expect(await liquid.parseAndRender('{% render "item" for items, item: "fallback" %}', { items: ['a', null, false] })).toBe('[a][fallback][false]')
+  })
+  it('should render once without forloop when for value is non-iterable', async function () {
+    mock({
+      '/item.html': '[{{ item }}|{{ forloop.length }}]'
+    })
+    expect(await liquid.parseAndRender('{% render "item" for nil, item: "fallback" %}')).toBe('[fallback|]')
+    expect(await liquid.parseAndRender('{% render "item" for 123 %}')).toBe('[123|]')
+    expect(await liquid.parseAndRender('{% render "item" for "" %}')).toBe('[|]')
+  })
+  it('should validate partial existence even when for array is empty', async function () {
+    mock({})
+    await expect(liquid.parseAndRender('{% render "missing" for empty_arr %}', { empty_arr: [] })).rejects.toThrow(/Failed to lookup "missing"/)
+  })
+  it('should treat none as variable in render and reject nil filepath', async function () {
+    mock({
+      '/foo.html': 'FOO'
+    })
+    expect(await liquid.parseAndRender('{% render none %}', { none: 'foo' })).toBe('FOO')
+    await expect(liquid.parseAndRender('{% render nil %}')).rejects.toThrow(/illegal file path "null"/)
+  })
   it('should support for...as with other parameters', async function () {
     mock({
       '/index.html': '{% render "item" for colors as color with ".\n" as tail sep: ". "%}',
