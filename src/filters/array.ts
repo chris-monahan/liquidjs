@@ -1,5 +1,5 @@
-import { toArray, argumentsToValue, toValue, toLiquid, stringify, caseInsensitiveCompare, orderedCompare, isArray, isNil, isString, isFunction, isIterable, readFirst, readLast, readSize, toEnumerable, advanceCodePoints, codePointLength, assert, Limiter, LiquidRuntimeError } from '../util'
-import { arrayIncludes, equals, evalToken, isTruthy } from '../render'
+import { toArray, argumentsToValue, toValue, toLiquid, stringify, caseInsensitiveCompare, orderedCompare, isArray, isNil, isString, isFunction, isIterable, isPropertyAccessToken, readArrayElement, readFirst, readLast, readSize, toEnumerable, advanceCodePoints, codePointLength, assert, Limiter, LiquidRuntimeError } from '../util'
+import { arrayIncludes, equals, evalToken, evalTokenValue, isTruthy } from '../render'
 import { Value, FilterImpl } from '../template'
 import { Tokenizer } from '../parser'
 import { readJSProperty, Scope } from '../context'
@@ -68,6 +68,87 @@ function rubyToS (v: unknown): string {
     return '{' + Object.entries(v).map(([k, val]) => `${rubyInspect(k)}=>${rubyInspect(val)}`).join(', ') + '}'
   }
   return stringify(v)
+}
+
+function extractNumber (v: unknown): number | undefined {
+  v = toValue(toLiquid(v))
+  if (typeof v === 'number') return Number.isFinite(v) ? v : undefined
+  if (typeof v === 'object' && v !== null && !isArray(v) && !isPlainObject(v) && !(v instanceof Drop) && !(v instanceof Date) && typeof (v as { valueOf?: unknown }).valueOf === 'function') {
+    const n = (v as { valueOf(): unknown }).valueOf()
+    if (typeof n === 'number') return Number.isFinite(n) ? n : undefined
+  }
+  return undefined
+}
+
+function * selectFilterProperty (this: FilterImpl, item: unknown, prop: unknown): Generator<unknown, unknown, unknown> {
+  const raw = toLiquid(item)
+  const u = raw instanceof EmptyDrop ? '' : toLiquid(yield toValue(raw))
+  const p = yield toValue(toLiquid(prop))
+  if (typeof u === 'string') {
+    if (typeof p === 'string') return u.includes(p) ? p : null
+    const num = extractNumber(p)
+    if (num !== undefined) {
+      const idx = Math.trunc(num)
+      const len = codePointLength(u)
+      const norm = idx < 0 ? len + idx : idx
+      if (norm < 0 || norm >= len) return null
+      const start = advanceCodePoints(u, 0, norm)
+      return u.slice(start, advanceCodePoints(u, start, 1))
+    }
+    throw new LiquidRuntimeError(`cannot select the property '${rubyToS(p)}'`)
+  }
+  if (typeof u === 'number' && Number.isInteger(u)) {
+    const num = extractNumber(p)
+    if (num !== undefined) {
+      const idx = Math.trunc(num)
+      if (idx < 0) return 0
+      if (idx >= 53) return u < 0 ? 1 : 0
+      return ((Math.floor(u / Math.pow(2, idx)) % 2) + 2) % 2
+    }
+    throw new LiquidRuntimeError(`cannot select the property '${rubyToS(p)}'`)
+  }
+  if (isArray(u)) {
+    const num = extractNumber(p)
+    if (num !== undefined) {
+      const idx = Math.trunc(num)
+      return readArrayElement(u, idx, this.context.ownPropertyOnly) ?? null
+    }
+    throw new LiquidRuntimeError(`cannot select the property '${rubyToS(p)}'`)
+  }
+  if (isNil(p)) return null
+  if (p === '') {
+    if (u instanceof Drop) return yield this.context.readProperty(u as Scope, '')
+    const val = readJSProperty(u as Scope, '', this.context.ownPropertyOnly)
+    return isFunction(val) ? yield val.call(u) : val
+  }
+  const k = stringify(p)
+  if (isPlainObject(u)) {
+    const direct = readJSProperty(u as Scope, k, this.context.ownPropertyOnly)
+    if (direct !== undefined || Object.prototype.hasOwnProperty.call(u, k)) {
+      return isFunction(direct) ? yield direct.call(u) : direct
+    }
+  }
+  if (k.includes('.') || k.includes('[')) {
+    let token
+    let atEnd = false
+    try {
+      const tokenizer = new Tokenizer(k)
+      token = tokenizer.readScopeValue()
+      atEnd = tokenizer.end()
+    } catch {
+      token = undefined
+    }
+    if (token && atEnd && isPropertyAccessToken(token)) {
+      const props: (string | number | Drop)[] = []
+      for (const propToken of token.props) {
+        props.push((yield evalTokenValue(propToken, this.context, false)) as unknown as string | number | Drop)
+      }
+      return yield this.context._getFromScope(u, props, false)
+    }
+  }
+  if (u instanceof Drop) return yield this.context.readProperty(u as Scope, k)
+  const val = readJSProperty(u as Scope, k, this.context.ownPropertyOnly)
+  return isFunction(val) ? yield val.call(u) : val
 }
 
 function * readDirectBracketProperty (this: FilterImpl, item: unknown, prop: unknown): Generator<unknown, unknown, unknown> {
@@ -156,35 +237,53 @@ export const reverse = argumentsToValue(function (this: FilterImpl, v: any[]) {
   return [...array].reverse()
 })
 
-function * sortBy<T> (this: FilterImpl, arr: T[], property: string | undefined, comparator: (a: unknown, b: unknown) => number): IterableIterator<unknown> {
-  const values: [T, unknown][] = []
-  const array = toArray(arr, this.context.memoryLimit)
+function * sortBy (this: FilterImpl, arr: unknown, property: unknown, comparator: (a: unknown, b: unknown) => number): IterableIterator<unknown> {
+  const array = toInputArray(yield toValue(toLiquid(arr)), this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
+  if (!array.length) return []
+  const prop = yield toValue(toLiquid(property))
+  const hasProperty = !isNil(prop)
+  if (hasProperty && !array.every(respondToBrackets)) return null
+  if (array.length <= 1) return [...array]
+  const values: [unknown, unknown][] = []
   for (const item of array) {
     values.push([
       item,
-      property ? yield this.context._getFromScope(item, stringify(property).split('.'), false) : item
+      hasProperty
+        ? yield toValue(yield * selectFilterProperty.call(this, item, prop))
+        : yield toValue(toLiquid(item))
     ])
   }
   return values.sort((lhs, rhs) => comparator(lhs[1], rhs[1])).map(tuple => tuple[0])
 }
 
-export function * sort<T> (this: FilterImpl, arr: T[], property?: string): IterableIterator<unknown> {
+export function * sort<T> (this: FilterImpl, arr: T[], property?: unknown): IterableIterator<unknown> {
   return yield * sortBy.call(this, arr, property, orderedCompare)
 }
 
-export function * sort_natural<T> (this: FilterImpl, arr: T[], property?: string): IterableIterator<unknown> {
+export function * sort_natural<T> (this: FilterImpl, arr: T[], property?: unknown): IterableIterator<unknown> {
   return yield * sortBy.call(this, arr, property, caseInsensitiveCompare)
 }
 
 export const size = argumentsToValue((v: any) => readSize(v) ?? 0)
 
-export function * map (this: FilterImpl, arr: Scope[], property: string): IterableIterator<unknown> {
+export function * map (this: FilterImpl, arr: Scope[], property: unknown): IterableIterator<unknown> {
+  if (arguments.length < 2) throw new LiquidRuntimeError('wrong number of arguments (given 1, expected 2)')
   const results = []
-  const array = toArray(arr, this.context.memoryLimit)
+  const array = toInputArray(yield toValue(toLiquid(arr)), this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
-  for (const item of array) {
-    results.push(yield this.context._getFromScope(item, stringify(property), false))
+  const prop = yield toValue(toLiquid(property))
+  for (let item of array) {
+    if (isFunction(item)) item = yield item()
+    if (prop === 'to_liquid') {
+      const v = toLiquid(item)
+      results.push(v === undefined ? null : v)
+    } else if (!respondToBrackets(item)) {
+      results.push(null)
+    } else {
+      const v = yield * selectFilterProperty.call(this, item, prop)
+      results.push(v === undefined ? null : v)
+    }
   }
   return results
 }
@@ -287,13 +386,14 @@ function * matches (this: FilterImpl, value: unknown, expected: unknown): Genera
   return yield equals(value, expected)
 }
 
-function * filter<T extends object> (this: FilterImpl, include: boolean, arr: T[], property: string, expected: any): IterableIterator<unknown> {
-  arr = toArray(arr, this.context.memoryLimit)
-  this.context.memoryLimit.use(arr.length)
-  const token = new Tokenizer(stringify(property)).readScopeValue()
-  const result: T[] = []
-  for (const item of arr) {
-    const value = yield evalToken(token, this.context.spawn(item))
+function * filter (this: FilterImpl, include: boolean, arr: unknown, property: unknown, expected: any): IterableIterator<unknown> {
+  const array = toInputArray(yield toValue(toLiquid(arr)), this.context.memoryLimit)
+  this.context.memoryLimit.use(array.length)
+  if (!array.length) return []
+  const result: unknown[] = []
+  for (const item of array) {
+    if (!respondToBrackets(item)) return null
+    const value = yield * selectFilterProperty.call(this, item, property)
     if ((yield matches.call(this, value, expected)) === include) result.push(item)
   }
   return result
@@ -313,11 +413,13 @@ function * filter_exp<T extends object> (this: FilterImpl, include: boolean, arr
   return filtered
 }
 
-export function * where<T extends object> (this: FilterImpl, arr: T[], property: string, expected?: any): IterableIterator<unknown> {
+export function * where<T extends object> (this: FilterImpl, arr: T[], property?: unknown, expected?: any): IterableIterator<unknown> {
+  if (arguments.length < 2) return []
   return yield * filter.call(this, true, arr, property, expected)
 }
 
-export function * reject<T extends object> (this: FilterImpl, arr: T[], property: string, expected?: any): IterableIterator<unknown> {
+export function * reject<T extends object> (this: FilterImpl, arr: T[], property?: unknown, expected?: any): IterableIterator<unknown> {
+  if (arguments.length < 2) return toInputArray(yield toValue(toLiquid(arr)), this.context.memoryLimit)
   return yield * filter.call(this, false, arr, property, expected)
 }
 
@@ -357,13 +459,16 @@ export function * group_by_exp<T extends object> (this: FilterImpl, arr: T[], it
   return [...map.entries()].map(([name, items]) => ({ name, items }))
 }
 
-function * search<T extends object> (this: FilterImpl, arr: T[], property: string, expected: string): IterableIterator<unknown> {
-  const token = new Tokenizer(stringify(property)).readScopeValue()
-  const array = toArray(arr, this.context.memoryLimit)
+function * search (this: FilterImpl, arr: unknown, property: unknown, expected?: any): Generator<unknown, [number, unknown] | null | undefined, unknown> {
+  const array = toInputArray(yield toValue(toLiquid(arr)), this.context.memoryLimit)
+  this.context.memoryLimit.use(array.length)
   for (let index = 0; index < array.length; index++) {
-    const value = yield evalToken(token, this.context.spawn(array[index]))
-    if (yield matches.call(this, value, expected)) return [index, array[index]]
+    const item = array[index]
+    if (!respondToBrackets(item)) return null
+    const value = yield * selectFilterProperty.call(this, item, property)
+    if (yield matches.call(this, value, expected)) return [index, item]
   }
+  return undefined
 }
 
 function * search_exp<T extends object> (this: FilterImpl, arr: T[], itemName: string, exp: string): IterableIterator<unknown> {
@@ -377,9 +482,10 @@ function * search_exp<T extends object> (this: FilterImpl, arr: T[], itemName: s
   }
 }
 
-export function * has<T extends object> (this: FilterImpl, arr: T[], property: string, expected?: any): IterableIterator<unknown> {
+export function * has<T extends object> (this: FilterImpl, arr: T[], property: unknown, expected?: any): IterableIterator<unknown> {
+  if (arguments.length < 2) throw new LiquidRuntimeError('wrong number of arguments (given 1, expected 2..3)')
   const result = yield * search.call(this, arr, property, expected)
-  return !!result
+  return result === null ? null : !!result
 }
 
 export function * has_exp<T extends object> (this: FilterImpl, arr: T[], itemName: string, exp: string): IterableIterator<unknown> {
@@ -387,9 +493,10 @@ export function * has_exp<T extends object> (this: FilterImpl, arr: T[], itemNam
   return !!result
 }
 
-export function * find_index<T extends object> (this: FilterImpl, arr: T[], property: string, expected?: any): IterableIterator<unknown> {
+export function * find_index<T extends object> (this: FilterImpl, arr: T[], property: unknown, expected?: any): IterableIterator<unknown> {
+  if (arguments.length < 2) throw new LiquidRuntimeError('wrong number of arguments (given 1, expected 2..3)')
   const result = yield * search.call(this, arr, property, expected)
-  return result ? result[0] : undefined
+  return result ? result[0] : null
 }
 
 export function * find_index_exp<T extends object> (this: FilterImpl, arr: T[], itemName: string, exp: string): IterableIterator<unknown> {
@@ -397,9 +504,10 @@ export function * find_index_exp<T extends object> (this: FilterImpl, arr: T[], 
   return result ? result[0] : undefined
 }
 
-export function * find<T extends object> (this: FilterImpl, arr: T[], property: string, expected?: any): IterableIterator<unknown> {
+export function * find<T extends object> (this: FilterImpl, arr: T[], property: unknown, expected?: any): IterableIterator<unknown> {
+  if (arguments.length < 2) throw new LiquidRuntimeError('wrong number of arguments (given 1, expected 2..3)')
   const result = yield * search.call(this, arr, property, expected)
-  return result ? result[1] : undefined
+  return result ? result[1] : null
 }
 
 export function * find_exp<T extends object> (this: FilterImpl, arr: T[], itemName: string, exp: string): IterableIterator<unknown> {
