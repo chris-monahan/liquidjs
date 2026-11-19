@@ -144,6 +144,25 @@ index index0 rindex rindex0
 5     4      1      0
 ```
 
+The `forloop.parentloop` property references the parent `forloop` object in nested `for` loops (or `nil` when not nested):
+
+Input
+```liquid
+{% for i in (1..2) -%}
+{% for j in (1..2) -%}
+{{ forloop.parentloop.index }}-{{ forloop.index }}
+{% endfor -%}
+{% endfor -%}
+```
+
+Output
+```text
+1-1
+1-2
+2-1
+2-2
+```
+
 ## Parameters
 
 ### limit
