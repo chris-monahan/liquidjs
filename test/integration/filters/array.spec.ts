@@ -70,6 +70,57 @@ describe('filters/array', function () {
       const c = { name: { first: 'Carol' } }
       return test(tpl, { arr: [a, b, c] }, 'Alice Bob Carol')
     })
+    it('should flatten nested arrays', function () {
+      const arr = [[{ a: 1 }], [{ a: 2 }, [{ a: 3 }]]]
+      return test('{{ arr | map: "a" | json }}', { arr }, '[1,2,3]')
+    })
+    it('should throw when property argument is missing', async function () {
+      await expect(render('{{ arr | map }}', { arr: [{ a: 1 }] })).rejects.toThrow('wrong number of arguments (given 1, expected 2)')
+      await test('{{ arr | map }}', { arr: [{ a: 1 }] }, 'Liquid error (line 1): wrong number of arguments (given 1, expected 2)', { inlineErrors: true })
+    })
+    it('should push null and continue for non-indexable items', function () {
+      const arr = [{ a: 1 }, false, null, 1.5, { a: 2 }]
+      return test('{{ arr | map: "a" | json }}', { arr }, '[1,null,null,null,2]')
+    })
+    it('should support to_liquid property', function () {
+      const arr = [{ a: 1 }, false, 2]
+      return test('{{ arr | map: "to_liquid" | json }}', { arr }, '[{"a":1},false,2]')
+    })
+    it('should index string items by substring and code-point offset', async function () {
+      await test('{{ arr | map: "be" | json }}', { arr: ['alpha', 'beta'] }, '[null,"be"]')
+      await test('{{ arr | map: "" | json }}', { arr: ['alpha', ''] }, '["",""]')
+      await test('{{ arr | map: 1 | json }}', { arr: ['a😀b', 'x'] }, '["😀",null]')
+      await test('{{ arr | map: -1.9 | json }}', { arr: ['alpha', 'b'] }, '["a","b"]')
+    })
+    it('should index integer items by bit position', async function () {
+      await test('{{ arr | map: 0 | json }}', { arr: [5, 6, -1, -2] }, '[1,0,1,0]')
+      await test('{{ arr | map: 1.8 | json }}', { arr: [5, 6, -1, -2] }, '[0,1,1,1]')
+      await test('{{ arr | map: -1 | json }}', { arr: [5, -1] }, '[0,0]')
+      await test('{{ arr | map: 60 | json }}', { arr: [5, -1] }, '[0,1]')
+    })
+    it('should index array items from iterable and support valueOf numeric wrappers', async function () {
+      class FloatWrapper {
+        constructor (private n: number) {}
+        valueOf () { return this.n }
+      }
+      const iter = new Set([['x', 'y'], ['z']])
+      await test('{{ iter | map: idx | json }}', { iter, idx: new FloatWrapper(0) }, '["x","z"]')
+      await test('{{ iter | map: -1 | json }}', { iter }, '["y","z"]')
+      await test('{{ iter | map: 5 | json }}', { iter }, '[null,null]')
+    })
+    it('should handle nil, empty-string, and literal dotted keys on objects', async function () {
+      await test('{{ arr | map: nil | json }}', { arr: [{ '': 'x', nil: 'y' }] }, '[null]')
+      await test('{{ arr | map: "" | json }}', { arr: [{ '': 'x' }, { a: 1 }] }, '["x",null]')
+      await test('{{ arr | map: "a.b" | json }}', { arr: [{ 'a.b': 1, a: { b: 9 } }, { a: { b: 2 } }] }, '[1,2]')
+    })
+    it('should throw on invalid property type for string, integer, or array items', async function () {
+      await expect(render('{{ arr | map: nil }}', { arr: ['alpha'] })).rejects.toThrow("cannot select the property ''")
+      await expect(render('{{ arr | map: true }}', { arr: ['alpha'] })).rejects.toThrow("cannot select the property 'true'")
+      await expect(render('{{ arr | map: inf }}', { arr: ['alpha'], inf: Infinity })).rejects.toThrow("cannot select the property 'Infinity'")
+      await expect(render('{{ arr | map: nan }}', { arr: [5], nan: NaN })).rejects.toThrow("cannot select the property 'NaN'")
+      await expect(render('{{ arr | map: "a" }}', { arr: [1, 2] })).rejects.toThrow("cannot select the property 'a'")
+      await expect(render('{{ iter | map: "a" }}', { iter: new Set([['x']]) })).rejects.toThrow("cannot select the property 'a'")
+    })
   })
   describe('sum', () => {
     it('should support sum with no args', function () {
@@ -402,6 +453,19 @@ describe('filters/array', function () {
       const arr = ['40', null, 30, undefined, true, false, 0, 'str', 50]
       await test('{% assign sorted = arr | sort %}{% for item in sorted %}[{{ item }}]{% endfor %}', { arr }, '[false][0][true][30][40][str][50][][]')
     })
+    it('should flatten nested arrays and ignore nil property', async () => {
+      await test('{{ arr | sort | join: "," }}', { arr: ['c', ['a', ['b']]] }, 'a,b,c')
+      await test('{{ arr | sort: nil | join: "," }}', { arr: [3, 1, 2] }, '1,2,3')
+    })
+    it('should return null when item does not respond to brackets with property', async () => {
+      await test('{{ arr | sort: "a" | json }}', { arr: [{ a: 2 }, false] }, 'null')
+      await test('{{ arr | sort: "a" | json }}', { arr: [false] }, 'null')
+    })
+    it('should sort string and integer items by numeric index and throw on invalid property', async () => {
+      await test('{{ arr | sort: 1 | join: "," }}', { arr: ['cb', 'ca'] }, 'ca,cb')
+      await test('{{ arr | sort: 0 | join: "," }}', { arr: [1, 2] }, '2,1')
+      await expect(render('{{ arr | sort: "a" }}', { arr: [1, 2] })).rejects.toThrow("cannot select the property 'a'")
+    })
   })
   describe('sort_natural', function () {
     it('should sort alphabetically', () => {
@@ -463,6 +527,10 @@ describe('filters/array', function () {
     it('should handle mixed-type items', async () => {
       const arr = ['40', null, 30, undefined, true, false, 0, 'str', 50]
       await test('{% assign sorted = arr | sort_natural %}{% for item in sorted %}[{{ item }}]{% endfor %}', { arr }, '[0][30][40][50][false][str][true][][]')
+    })
+    it('should return null for non-indexable items and throw on invalid property', async () => {
+      await test('{{ arr | sort_natural: "a" | json }}', { arr: [{ a: 'b' }, null] }, 'null')
+      await expect(render('{{ arr | sort_natural: true }}', { arr: ['ab', 'cd'] })).rejects.toThrow("cannot select the property 'true'")
     })
   })
   describe('uniq', function () {
@@ -684,6 +752,24 @@ describe('filters/array', function () {
       const scope = { objs: [{ foo: ['FOO', 'bar'] }] }
       await test('{{objs | where: "foo", "FOO" | json}}', scope, '[]')
     })
+    it('should flatten nested arrays and return null when item does not respond to brackets', async () => {
+      await test('{{ arr | where: "a", 2 | json }}', { arr: [[{ a: 1 }], [{ a: 2 }]] }, '[{"a":2}]')
+      await test('{{ arr | where: "a" | json }}', { arr: [{ a: 1 }, false] }, 'null')
+      await test('{{ arr | where: "a" | json }}', { arr: [1.5] }, 'null')
+      await test('{{ arr | where: "a" | json }}', { arr: [] }, '[]')
+    })
+    it('should index string, EmptyDrop, and integer items and throw on invalid property', async () => {
+      await test('{{ arr | where: "be" | json }}', { arr: ['alpha', 'beta'] }, '["beta"]')
+      await test('{{ arr | where: "" | json }}', { arr: ['alpha', ''] }, '["alpha",""]')
+      await test('{{ empty | where: "" | size }}', {}, '1')
+      await test('{{ empty | where: "a" | size }}', {}, '0')
+      await test('{{ arr | where: 1, "😀" | json }}', { arr: ['a😀b', 'abc'] }, '["a😀b"]')
+      await test('{{ arr | where: 0, 1 | json }}', { arr: [5, 6, -1, -2] }, '[5,-1]')
+      await test('{{ arr | where: nil | json }}', { arr: [{ a: 1 }] }, '[]')
+      await test('{{ arr | where: "" | json }}', { arr: [{ '': 'yes' }, { a: 1 }] }, '[{"":"yes"}]')
+      await expect(render('{{ arr | where: "a" }}', { arr: [1, 2] })).rejects.toThrow("cannot select the property 'a'")
+      await test('{{ arr | where: "a" }}', { arr: [1, 2] }, "Liquid error (line 1): cannot select the property 'a'", { inlineErrors: true })
+    })
     describe('jekyll style', () => {
       it('should filter arrays by inclusion', async () => {
         const scope = { objs: [{ foo: ['FOO', 'bar'] }] }
@@ -798,6 +884,12 @@ describe('filters/array', function () {
         await test('{{products | reject: "type" | map: "title" | join: ","}}', { products },
           'Vacuum,Spatula,Television,Garlic press', { jekyllWhere: true })
       })
+    })
+    it('should return null when item does not respond to brackets and support string/int indexing', async () => {
+      await test('{{ arr | reject: "a" | json }}', { arr: [{ a: 1 }, null] }, 'null')
+      await test('{{ arr | reject: "be" | json }}', { arr: ['alpha', 'beta'] }, '["alpha"]')
+      await test('{{ arr | reject: 0, 1 | json }}', { arr: [5, 6, 7] }, '[6]')
+      await test('{{ arr | reject | size }}', { arr: [1, [2, 3]] }, '3')
     })
   })
   describe('reject_exp', function () {
@@ -939,6 +1031,15 @@ describe('filters/array', function () {
         await test('{{members | has: "name", notdefined}}', { members }, 'false', { jekyllWhere: true })
       })
     })
+    it('should lazily check bracket support and handle empty or invalid inputs', async () => {
+      await test('{{ arr | has: "a" | json }}', { arr: [] }, 'false')
+      await test('{{ arr | has: "a" | json }}', { arr: [{ a: 1 }, false] }, 'true')
+      await test('{{ arr | has: "a" | json }}', { arr: [{ b: 1 }, false] }, 'null')
+      await test('{{ arr | has: "a" | json }}', { arr: [false] }, 'null')
+      await test('{{ arr | has: "be" | json }}', { arr: ['alpha', 'beta'] }, 'true')
+      await expect(render('{{ arr | has }}', { arr: [{ a: 1 }] })).rejects.toThrow('wrong number of arguments (given 1, expected 2..3)')
+      await expect(render('{{ arr | has: "a" }}', { arr: [1] })).rejects.toThrow("cannot select the property 'a'")
+    })
   })
   describe('has_exp', function () {
     const members = [
@@ -977,11 +1078,15 @@ describe('filters/array', function () {
         { members },
         `{"graduation_year":2014,"name":"John"}`)
     })
-    it('should render none if not found', function () {
-      return test(
-        `{{ members | find: "graduation_year", 2018 | json }}`,
+    it('should render none if not found', async function () {
+      await test(
+        `{{ members | find: "graduation_year", 2018 }}`,
         { members },
         ``)
+      await test(
+        `{{ members | find: "graduation_year", 2018 | json }}`,
+        { members },
+        `null`)
     })
     describe('jekyll style', () => {
       it('should select array by inclusion', async () => {
@@ -998,8 +1103,16 @@ describe('filters/array', function () {
           { members },
           '{"graduation_year":2013,"name":"Jay"}',
           { jekyllWhere: true })
-        await test('{{members | find: "name", notdefined | json}}', { members }, '', { jekyllWhere: true })
+        await test('{{members | find: "name", notdefined | json}}', { members }, 'null', { jekyllWhere: true })
       })
+    })
+    it('should lazily check bracket support and handle empty or invalid inputs', async () => {
+      await test('{{ arr | find: "a" | json }}', { arr: [] }, 'null')
+      await test('{{ arr | find: "a" | json }}', { arr: [{ a: 1 }, false] }, '{"a":1}')
+      await test('{{ arr | find: "a" | json }}', { arr: [{ b: 1 }, false] }, 'null')
+      await test('{{ arr | find: 0, 1 | json }}', { arr: [4, 5, 6] }, '5')
+      await expect(render('{{ arr | find }}', { arr: [{ a: 1 }] })).rejects.toThrow('wrong number of arguments (given 1, expected 2..3)')
+      await expect(render('{{ arr | find: "a" }}', { arr: [1] })).rejects.toThrow("cannot select the property 'a'")
     })
   })
   describe('find_exp', function () {
@@ -1039,11 +1152,15 @@ describe('filters/array', function () {
         { members },
         `1`)
     })
-    it('should render none if not found', function () {
-      return test(
-        `{{ members | find_index: "graduation_year", 2018 | json }}`,
+    it('should render none if not found', async function () {
+      await test(
+        `{{ members | find_index: "graduation_year", 2018 }}`,
         { members },
         ``)
+      await test(
+        `{{ members | find_index: "graduation_year", 2018 | json }}`,
+        { members },
+        `null`)
     })
     describe('jekyll style', () => {
       it('should select array by inclusion', async () => {
@@ -1056,8 +1173,16 @@ describe('filters/array', function () {
       })
       it('should search plainly when target is undefined', async () => {
         await test('{{members | find_index: "age", notdefined | json}}', { members }, '0', { jekyllWhere: true })
-        await test('{{members | find_index: "name", notdefined | json}}', { members }, '', { jekyllWhere: true })
+        await test('{{members | find_index: "name", notdefined | json}}', { members }, 'null', { jekyllWhere: true })
       })
+    })
+    it('should lazily check bracket support and handle empty or invalid inputs', async () => {
+      await test('{{ arr | find_index: "a" | json }}', { arr: [] }, 'null')
+      await test('{{ arr | find_index: "a" | json }}', { arr: [{ a: 1 }, false] }, '0')
+      await test('{{ arr | find_index: "a" | json }}', { arr: [{ b: 1 }, false] }, 'null')
+      await test('{{ arr | find_index: "be" | json }}', { arr: ['alpha', 'beta'] }, '1')
+      await expect(render('{{ arr | find_index }}', { arr: [{ a: 1 }] })).rejects.toThrow('wrong number of arguments (given 1, expected 2..3)')
+      await expect(render('{{ arr | find_index: "a" }}', { arr: [1] })).rejects.toThrow("cannot select the property 'a'")
     })
   })
   describe('find_index_exp', function () {
