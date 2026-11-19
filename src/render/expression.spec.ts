@@ -209,7 +209,9 @@ describe('Expression', function () {
       expect(await toPromise(create('foo[foo["key"]]').evaluate(ctx))).toBe('BAR')
     })
     it('should allow string as property read variable', async function () {
-      expect(await toPromise(create('"foo"[2]').evaluate(ctx))).toBe('o')
+      expect(await toPromise(create('"foo".first').evaluate(ctx))).toBe('f')
+      expect(await toPromise(create('"foo".size').evaluate(ctx))).toBe(3)
+      expect(await toPromise(create('"foo"[2]').evaluate(ctx))).toBeUndefined()
     })
     it('should allow range as property read variable', async function () {
       expect(await toPromise(create('(3..5).size').evaluate(ctx))).toBe(3)

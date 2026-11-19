@@ -4,6 +4,7 @@ import type { Context } from '../context'
 import type { UnaryOperatorHandler } from '../render'
 import { Drop } from '../drop'
 import { Filter } from '../template/filter'
+import { IdentifierToken } from '../tokens/identifier-token'
 
 export class Expression {
   readonly postfix: Token[]
@@ -75,15 +76,18 @@ export function * evalTokenValue (token: Token | undefined, ctx: Context, lenien
 
 function * evalPropertyAccessToken (token: PropertyAccessToken, ctx: Context, lenient: boolean): IterableIterator<unknown> {
   const props: (string | number | Drop)[] = []
-  for (const prop of token.props) {
+  const commands: boolean[] = []
+  for (let i = 0; i < token.props.length; i++) {
+    const prop = token.props[i]
+    commands.push((!!token.variable || i > 0) && prop instanceof IdentifierToken)
     props.push((yield evalTokenValue(prop, ctx, false)) as unknown as string | number | Drop)
   }
   try {
     if (token.variable) {
       const variable = yield evalToken(token.variable, ctx, lenient)
-      return yield ctx._getFromScope(variable, props)
+      return yield ctx._getFromScope(variable, props, ctx.strictVariables, commands)
     } else {
-      return yield ctx._get(props)
+      return yield ctx._get(props, commands)
     }
   } catch (e) {
     if (lenient && (e as Error).name === 'InternalUndefinedVariableError') return null
