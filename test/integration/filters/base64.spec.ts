@@ -114,4 +114,20 @@ describe('filters/base64', function () {
       return test(`{{ "${complexString}" | base64_encode | base64_decode }}`, complexString)
     })
   })
+
+  describe('base64_url_safe_encode and base64_url_safe_decode', function () {
+    it('should encode URL-unsafe base64 characters with - and _', () => {
+      return test('{{ "✅" | base64_url_safe_encode }}', '4pyF')
+    })
+
+    it('should round-trip through base64_url_safe_encode and base64_url_safe_decode', async () => {
+      const input = 'abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 !@#$%^&*()-=_+/?.:;[]{}\\|'
+      await test('{{ s | base64_url_safe_encode | base64_url_safe_decode }}', { s: input }, input)
+    })
+
+    it('should render inline error on invalid base64_decode and base64_url_safe_decode input', async () => {
+      await test('{{ "YWJj!!" | base64_decode }}', {}, 'Liquid error (line 1): invalid base64 provided to base64_decode', { inlineErrors: true })
+      await test('{{ "YWJj!!" | base64_url_safe_decode }}', {}, 'Liquid error (line 1): invalid base64 provided to base64_url_safe_decode', { inlineErrors: true })
+    })
+  })
 })

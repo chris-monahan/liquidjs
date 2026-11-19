@@ -17,12 +17,22 @@ describe('filters/html', function () {
     it('should escape undefined', function () {
       return test('{{ nonExistent.value | escape }}', '')
     })
+    it('should return nil for nil input and escape double quotes as &quot;', async function () {
+      await test('{% assign v = nil | escape %}{% if v %}truthy{% else %}falsy{% endif %}', 'falsy')
+      await test('{{ \'"hi"\' | escape }}', '&quot;hi&quot;')
+      await test('{{ "<b>" | h }}', '&lt;b&gt;')
+    })
+    it('should raise wrong number of arguments when given extra arguments', function () {
+      return test('{{ "<html>" | escape: "extra" }}', {}, 'Liquid error (line 1): wrong number of arguments (given 2, expected 1)', { inlineErrors: true })
+    })
   })
   describe('escape_once', function () {
     it('should do escape', () =>
       test('{{ "1 < 2 & 3" | escape_once }}', '1 &lt; 2 &amp; 3'))
     it('should not escape twice',
       () => test('{{ "1 &lt; 2 &amp; 3" | escape_once }}', '1 &lt; 2 &amp; 3'))
+    it('should preserve named and numeric entities', () =>
+      test('{{ "&nbsp; &#34; &quot;" | escape_once }}', '&nbsp; &#34; &quot;'))
     it('should escape nil value to empty string', () =>
       test('{{ undefinedValue | escape_once }}', ''))
   })
@@ -88,6 +98,9 @@ describe('filters/html', function () {
     it('should not loop on unclosed openers (GHSA-m7fp-h3p4-hr49)', function () {
       expect(liquid.parseAndRenderSync('{{ "a<" | strip_html }}')).toBe('a<')
       expect(liquid.parseAndRenderSync('{{ "hello<world<again" | strip_html }}')).toBe('hello<world<again')
+    })
+    it('should strip blocks before generic tags in two passes', function () {
+      expect(liquid.parseAndRenderSync('{{ a | strip_html }}', { a: '<<<script </script>script>foo;</script>' })).toBe('foo;')
     })
   })
 })

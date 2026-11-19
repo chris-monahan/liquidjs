@@ -10,7 +10,7 @@ import { MapFS } from './fs/map-fs'
 import { formatInlineError, type InlineError } from './render/inline-error'
 import type { LiquidError } from './util/error'
 
-type OutputEscape = (value: any) => string
+type OutputEscape = (value: any) => string | null | undefined
 type OutputEscapeOption = 'escape' | 'json' | OutputEscape
 
 export interface LiquidOptions {

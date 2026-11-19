@@ -14,6 +14,9 @@ describe('filters/object', function () {
     it('should output false when allow_false=true', async () => expect(await liquid.parseAndRender('{{false | default: true, allow_false: true}}')).toBe('false'))
     it('should output default without allow_false', async () => expect(await liquid.parseAndRender('{{false | default: true}}')).toBe('true'))
     it('should output default when allow_false=false', async () => expect(await liquid.parseAndRender('{{false | default: true, allow_false: false}}')).toBe('true'))
+    it('should use default for empty object', async () => expect(await liquid.parseAndRender('{{obj | default: "a"}}', { obj: {} })).toBe('a'))
+    it('should treat sole key-value pairs as a hash default value', async () => expect(await liquid.parseAndRender('{% assign ugh = null | default: foo: "bar" %}{{ ugh.foo }}')).toBe('bar'))
+    it('should combine mixed positional and key-value parameters like Ruby', async () => expect(await liquid.parseAndRender('{% assign v = false | default: mykey: 42, allow_false: false, true %}{{ v }}')).toBe('true'))
     it('should throw for additional args', () => {
       const src = `{{ age | default: 'now'  date: '%d'}}` // missing `|` before `date`
       return expect(liquid.parseAndRender(src)).rejects.toThrow(/unexpected character "date: '%d'"/)
