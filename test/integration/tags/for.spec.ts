@@ -443,4 +443,77 @@ describe('tags/for', function () {
       })
     })
   })
+
+  describe('parentloop', function () {
+    afterEach(restore)
+
+    it('should access parentloop properties in nested for loops', async function () {
+      const src = '{% for i in (1..2) %}' +
+        '{% for j in (1..2) %}' +
+        '{{ forloop.parentloop.first }}.{{ forloop.parentloop.index }}.{{ forloop.parentloop.index0 }}.' +
+        '{{ forloop.parentloop.last }}.{{ forloop.parentloop.rindex }}.{{ forloop.parentloop.length }}:' +
+        '{{ forloop.index }}\n' +
+        '{% endfor %}' +
+        '{% endfor %}'
+      const html = await liquid.parseAndRender(src, scope)
+      expect(html).toBe(
+        'true.1.0.false.2.2:1\n' +
+        'true.1.0.false.2.2:2\n' +
+        'false.2.1.true.1.2:1\n' +
+        'false.2.1.true.1.2:2\n'
+      )
+    })
+
+    it('should support 3-level nested parentloop', async function () {
+      const src = '{% for i in (1..2) %}' +
+        '{% for j in (1..2) %}' +
+        '{% for k in (1..2) %}' +
+        '{{ forloop.parentloop.parentloop.index }}.{{ forloop.parentloop.index }}.{{ forloop.index }} ' +
+        '{% endfor %}' +
+        '{% endfor %}' +
+        '{% endfor %}'
+      const html = await liquid.parseAndRender(src, scope)
+      expect(html).toBe('1.1.1 1.1.2 1.2.1 1.2.2 2.1.1 2.1.2 2.2.1 2.2.2 ')
+    })
+
+    it('should return nil for top-level forloop.parentloop', async function () {
+      const engine = new Liquid({ strictVariables: true })
+      const src = '{% for i in (1..2) %}' +
+        '{{ forloop.parentloop }}' +
+        '{% if forloop.parentloop == nil %}nil{% endif %}' +
+        '{% if forloop.parentloop %}truthy{% endif %},' +
+        '{% endfor %}'
+      const html = await engine.parseAndRender(src, scope)
+      expect(html).toBe('nil,nil,')
+    })
+
+    it('should pop forStack across sibling loops and after break', async function () {
+      const src = '{% for i in (1..2) %}' +
+        '{% for j in (1..2) %}{{ forloop.parentloop.index }}.{{ j }}{% break %}{% endfor %}-' +
+        '{% for k in (1..2) %}{{ forloop.parentloop.index }}.{{ k }}{% endfor %}|' +
+        '{% if forloop.parentloop == nil %}ok{% endif %} ' +
+        '{% endfor %}'
+      const html = await liquid.parseAndRender(src, scope)
+      expect(html).toBe('1.1-1.11.2|ok 2.1-2.12.2|ok ')
+    })
+
+    it('should share parentloop across include but isolate in render', async function () {
+      mock({
+        'inc-loop.liquid': '{% for j in (1..2) %}{{ forloop.parentloop.index }}.{{ j }} {% endfor %}',
+        'inc-read.liquid': '{{ forloop.parentloop.index }}.{{ forloop.index }} ',
+        'ren-loop.liquid': '{% for j in (1..2) %}{% if forloop.parentloop == nil %}nil:{{ j }} {% endif %}{% endfor %}'
+      })
+      const src1 = '{% for i in (1..2) %}{% include "inc-loop.liquid" %}|{% render "ren-loop.liquid" %}{% endfor %}'
+      expect(await liquid.parseAndRender(src1, scope)).toBe('1.1 1.2 |nil:1 nil:2 2.1 2.2 |nil:1 nil:2 ')
+
+      const src2 = '{% for i in (1..2) %}{% for j in (1..2) %}{% include "inc-read.liquid" %}{% endfor %}{% endfor %}'
+      expect(await liquid.parseAndRender(src2, scope)).toBe('1.1 1.2 2.1 2.2 ')
+    })
+
+    it('should serialize nested forloop without parent field', async function () {
+      const src = '{% for i in (1..1) %}{% for j in (1..1) %}{{ forloop }}{% endfor %}{% endfor %}'
+      const html = await liquid.parseAndRender(src, scope)
+      expect(html).toBe('{"i":0,"length":1,"name":"j-(1..1)"}')
+    })
+  })
 })

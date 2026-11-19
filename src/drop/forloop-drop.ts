@@ -4,10 +4,15 @@ export class ForloopDrop extends Drop {
   protected i = 0
   public name: string
   public length: number
-  public constructor (length: number, collection: string, variable: string) {
+  private readonly parent?: ForloopDrop
+  public constructor (length: number, collection: string, variable: string, parentloop?: ForloopDrop) {
     super()
     this.length = length
     this.name = `${variable}-${collection}`
+    Object.defineProperty(this, 'parent', { value: parentloop, enumerable: false })
+  }
+  public parentloop () {
+    return this.parent ?? null
   }
   public next () {
     this.i++
