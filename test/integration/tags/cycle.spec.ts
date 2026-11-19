@@ -44,4 +44,25 @@ describe('tags/cycle', function () {
     const html = liquid.parseAndRenderSync(src + src + src + src)
     return expect(html).toBe('1231')
   })
+
+  it('should render falsy literal values', async function () {
+    expect(await liquid.parseAndRender('{% cycle true, false %}{% cycle true, false %}')).toBe('truefalse')
+    expect(await liquid.parseAndRender('{% cycle 0, 1 %}{% cycle 0, 1 %}')).toBe('01')
+  })
+
+  it('should keep separate counters for distinct unnamed variable cycle tags', async function () {
+    expect(await liquid.parseAndRender("{% assign x = '1' %}{% cycle x, '2' %}{% cycle x, '2' %}")).toBe('11')
+    expect(await liquid.parseAndRender("{% assign x = '1' %}{% for i in (1..4) %}{% cycle x, '2' %}{% endfor %}")).toBe('1212')
+  })
+
+  it('should share counter for identical unnamed literal cycles across quote styles', async function () {
+    expect(await liquid.parseAndRender('{% cycle \'a\', \'b\' %}{% cycle "a", "b" %}')).toBe('ab')
+    expect(await liquid.parseAndRender("{% cycle '1', '2' %}{% cycle 1, 2 %}")).toBe('11')
+  })
+
+  it('should share named cycle counter by group value alone', async function () {
+    expect(await liquid.parseAndRender("{% cycle 'g': 'a', 'b', 'c' %}{% cycle 'g': 'x', 'y' %}{% cycle 'g': 'x', 'y' %}")).toBe('ayx')
+    expect(await liquid.parseAndRender("{% cycle 'g': 'a', 'b', 'c' %}{% cycle 'g': 'a', 'b', 'c' %}{% cycle 'g': 'x', 'y' %}{% cycle 'g': 'x', 'y' %}")).toBe('abx')
+    expect(await liquid.parseAndRender("{% cycle 1: 'a', 'b' %}{% cycle '1': 'a', 'b' %}{% cycle 1: 'a', 'b' %}{% cycle '1': 'a', 'b' %}")).toBe('aabb')
+  })
 })
