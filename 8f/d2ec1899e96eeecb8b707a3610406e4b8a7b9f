@@ -1,0 +1,22 @@
+src/tags/for.ts
+  h_f60b77838d081d 2-3,41,43-87,89,126-127,139-142
+src/util/index.ts
+  h_f60b77838d081d 13
+src/util/to-integer.spec.ts
+  h_f60b77838d081d 1-78
+src/util/to-integer.ts
+  h_f60b77838d081d 1-60
+test/integration/tags/for.spec.ts
+  h_f60b77838d081d 4,127-137,268-280,289-294,325-342,363-369
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8fd2ec1899e96eeecb8b707a3610406e4b8a7b9f",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
