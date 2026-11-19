@@ -1,0 +1,49 @@
+test/integration/liquid/range.spec.ts
+  h_f60b77838d081d 1-139
+src/index.ts
+  h_f60b77838d081d 4
+src/filters/string.ts
+  h_f60b77838d081d 227
+src/drop/empty-drop.ts
+  h_f60b77838d081d 4,11
+src/tags/tablerow.ts
+  h_f60b77838d081d 2-3,44-46
+test/integration/tags/assign.spec.ts
+  h_f60b77838d081d 26,29,108
+src/render/expression.spec.ts
+  h_f60b77838d081d 5,224-225,228-229,232-234
+src/render/operator.ts
+  h_f60b77838d081d 6,46
+src/tags/for.ts
+  h_f60b77838d081d 4,72-74
+src/context/context.ts
+  h_f60b77838d081d 2,144,154-160
+  h_f60b77838d081d 141,145
+src/tags/render.ts
+  h_f60b77838d081d 4,59
+src/util/liquid-range.ts
+  h_f60b77838d081d 1-55
+src/filters/array.ts
+  h_f60b77838d081d 9,23,30,53,63,72,78-79,89,97,105,135,149,178,192,206,215,255
+src/util/index.ts
+  h_f60b77838d081d 11
+test/integration/tags/if.spec.ts
+  h_f60b77838d081d 1,210
+src/util/underscore.ts
+  h_f60b77838d081d 2-3,65,69-72,78,82-85,172,186
+src/render/expression.ts
+  h_f60b77838d081d 2,8-9,104-118,120-122
+test/integration/tags/include.spec.ts
+  h_f60b77838d081d 143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bfb1f408bd61c6c028f153203657970aecf7b47b",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
