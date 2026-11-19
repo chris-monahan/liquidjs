@@ -3,6 +3,7 @@ import ForTag from './for'
 import CaptureTag from './capture'
 import CaseTag from './case'
 import CommentTag from './comment'
+import DocTag from './doc'
 import IncludeTag from './include'
 import RenderTag from './render'
 import DecrementTag from './decrement'
@@ -27,6 +28,7 @@ export const tags: Record<string, TagClass> = {
   capture: CaptureTag,
   'case': CaseTag,
   comment: CommentTag,
+  doc: DocTag,
   include: IncludeTag,
   render: RenderTag,
   decrement: DecrementTag,
@@ -45,4 +47,4 @@ export const tags: Record<string, TagClass> = {
   '#': InlineCommentTag
 }
 
-export { AssignTag, ForTag, CaptureTag, CaseTag, CommentTag, IncludeTag, RenderTag, DecrementTag, IncrementTag, CycleTag, IfTag, LayoutTag, BlockTag, RawTag, TablerowTag, UnlessTag, BreakTag, ContinueTag, EchoTag, LiquidTag, InlineCommentTag }
+export { AssignTag, ForTag, CaptureTag, CaseTag, CommentTag, DocTag, IncludeTag, RenderTag, DecrementTag, IncrementTag, CycleTag, IfTag, LayoutTag, BlockTag, RawTag, TablerowTag, UnlessTag, BreakTag, ContinueTag, EchoTag, LiquidTag, InlineCommentTag }

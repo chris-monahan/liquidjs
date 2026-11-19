@@ -29,8 +29,11 @@ describe('LiquidOptions#rawTags', function () {
   it('should throw when not closed', function () {
     expect(() => liquid.parse('{% schema %}{ "a": 1 }')).toThrow(/schema "{% schema %}.*" not closed/)
   })
-  it('should keep raw as the default', function () {
-    expect(() => new Liquid().parse('{% schema %}{{ "a\\" }}{% endschema %}')).toThrow()
-    expect(new Liquid().parseAndRenderSync('{% raw %}{{ a }}{% endraw %}')).toBe('{{ a }}')
+  it('should keep raw and doc as the default', function () {
+    const defaultLiquid = new Liquid()
+    expect(defaultLiquid.options.rawTags).toEqual(['raw', 'doc'])
+    expect(() => defaultLiquid.parse('{% schema %}{{ "a\\" }}{% endschema %}')).toThrow()
+    expect(defaultLiquid.parseAndRenderSync('{% raw %}{{ a }}{% endraw %}')).toBe('{{ a }}')
+    expect(defaultLiquid.parseAndRenderSync('{% doc %}{{ "a\\" }}{% enddoc %}')).toBe('')
   })
 })

@@ -89,7 +89,7 @@ export interface LiquidOptions {
   orderedFilterParameters?: boolean;
   /** Allow parenthesized expressions as operands in conditions and loops, e.g. `{% if (foo | upcase) == "BAR" %}`. This is a non-standard extension to Liquid. Defaults to `false`. */
   groupedExpressions?: boolean;
-  /** Tags whose content is output as-is until the matching `end` tag, like `raw`. Defaults to `['raw']`. */
+  /** Tags whose content is not parsed as Liquid until the matching `end` tag, like `raw` and `doc`. Defaults to `['raw', 'doc']`. */
   rawTags?: string[];
   /** For DoS handling, limit total length of templates parsed in one `parse()` call. A typical PC can handle 1e8 (100M) characters without issues. */
   parseLimit?: number;
@@ -205,7 +205,7 @@ export const defaultOptions: NormalizedFullOptions = {
   keepOutputType: false,
   operators: defaultOperators,
   groupedExpressions: false,
-  rawTags: ['raw'],
+  rawTags: ['raw', 'doc'],
   memoryLimit: Infinity,
   parseLimit: Infinity,
   renderLimit: Infinity

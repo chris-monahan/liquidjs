@@ -122,6 +122,7 @@ tags:
   comment: comment.html
   cycle: cycle.html
   decrement: decrement.html
+  doc: doc.html
   echo: echo.html
   else: if.html
   elsif: if.html
