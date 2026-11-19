@@ -1,0 +1,22 @@
+docs/source/tags/include.md
+  h_f60b77838d081d 36-41,51-62
+src/tags/include.ts
+  h_f60b77838d081d 1,3,6-7,12,19,23,25-26,28-59,64-81,99-100,115-116
+src/template/hash.spec.ts
+  h_f60b77838d081d 53-60
+src/template/hash.ts
+  h_f60b77838d081d 26
+test/integration/tags/include.spec.ts
+  h_f60b77838d081d 63,67-74,110-162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6e8d96754f8213c3077ad58c4dcd15189a13ea5f",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
