@@ -1,0 +1,32 @@
+docs/source/filters/overview.md
+  h_f60b77838d081d 18
+src/filters/base64.ts
+  h_f60b77838d081d 8-9,12-30,40-41,44,48-60,66-70
+src/filters/html.ts
+  h_f60b77838d081d 2-4,10,13-30,33-35,37,41,43,46,49-53,56-57,63,67,71,75-79,82-85,89-98
+src/filters/misc.ts
+  h_f60b77838d081d 1-4,8-13,26-64
+src/filters/url.ts
+  h_f60b77838d081d 1-4,8-47
+src/liquid-options.ts
+  h_f60b77838d081d 13
+test/integration/filters/base64.spec.ts
+  h_f60b77838d081d 117-132
+test/integration/filters/html.spec.ts
+  h_f60b77838d081d 20-27,34-35,102-104
+test/integration/filters/misc.spec.ts
+  h_f60b77838d081d 17-19
+test/integration/filters/url.spec.ts
+  h_f60b77838d081d 23-28,41-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "57b18796d040a9acd962438ccf6544eb3821afcc",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
