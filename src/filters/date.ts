@@ -8,8 +8,10 @@ export function date (this: FilterImpl, v: string | Date, format?: string, timez
   const date = parseDate(v, this.context.opts, timezoneOffset)
   if (!date) return v
   format = toValue(format)
-  format = isNil(format) ? this.context.opts.dateFormat : stringify(format)
+  const isNilFormat = isNil(format)
+  format = isNilFormat ? this.context.opts.dateFormat : stringify(format)
   this.context.memoryLimit.use(format.length)
+  if (!isNilFormat && format === '') return v
   return strftime(date, format, this.context.memoryLimit)
 }
 
@@ -50,7 +52,7 @@ function parseDate (v: string | Date, opts: NormalizedFullOptions, timezoneOffse
   v = toValue(v)
   if (isNil(v)) {
     return undefined
-  } else if (v === 'now' || v === 'today') {
+  } else if (isString(v) && (v.toLowerCase() === 'now' || v.toLowerCase() === 'today')) {
     date = new LiquidDate(Date.now(), locale, defaultTimezoneOffset)
   } else if (isNumber(v)) {
     date = new LiquidDate(v * 1000, locale, defaultTimezoneOffset)
