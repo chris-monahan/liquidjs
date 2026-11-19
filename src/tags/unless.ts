@@ -46,7 +46,7 @@ export default class extends Tag {
     const r = this.liquid.renderer
 
     for (const { value, test, templates } of this.branches) {
-      const v = yield toValue(yield value.value(ctx, ctx.opts.lenientIf))
+      const v = yield toValue(yield value.value(ctx, ctx.opts.lenientIf, true))
       if (test(v, ctx)) {
         yield r.renderTemplates(templates, ctx, emitter)
         return

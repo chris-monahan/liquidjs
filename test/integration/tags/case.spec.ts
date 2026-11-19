@@ -158,4 +158,8 @@ describe('tags/case', function () {
       })
     })
   })
+  it('should repeat branch body for each matching value in when', async function () {
+    const html = await liquid.parseAndRender('{% case "a" %}{% when "a", "a" %}M{% endcase %}')
+    expect(html).toBe('MM')
+  })
 })
