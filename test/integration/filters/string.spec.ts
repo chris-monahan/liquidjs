@@ -8,7 +8,7 @@ describe('filters/string', function () {
       () => test('{{ -3 | append: "abc" }}', '-3abc'))
     it('should return "abar" for "a", foo', () => test('{{ "a" | append: foo }}', { foo: 'bar' }, 'abar'))
     it('should throw if second argument not set', () => {
-      return expect(test('{{ "abc" | append }}', 'abc')).rejects.toThrow(/2 arguments/)
+      return expect(test('{{ "abc" | append }}', 'abc')).rejects.toThrow('wrong number of arguments (given 1, expected 2)')
     })
     it('should return "abcfalse" for "abc", false', () => test('{{ "abc" | append: false }}', 'abcfalse'))
   })
@@ -17,7 +17,7 @@ describe('filters/string', function () {
       () => test('{{ -3 | prepend: "abc" }}', 'abc-3'))
     it('should return "abar" for "a", foo', () => test('{{ "a" | prepend: foo }}', { foo: 'bar' }, 'bara'))
     it('should throw if second argument not set', () => {
-      return expect(test('{{ "abc" | prepend }}', 'abc')).rejects.toThrow(/2 arguments/)
+      return expect(test('{{ "abc" | prepend }}', 'abc')).rejects.toThrow('wrong number of arguments (given 1, expected 2)')
     })
     it('should return "falseabc" for "abc", false', () => test('{{ "abc" | prepend: false }}', 'falseabc'))
   })
@@ -243,6 +243,16 @@ describe('filters/string', function () {
     it('should keep a lone surrogate in the input', function () {
       return test('{{ s | truncate: 3, "" }}', { s: 'a\ud83db\ude00c' }, 'a\ud83db')
     })
+    it('should return empty on nil input without coercing length', function () {
+      return test('{{ nil | truncate: nil }}', '')
+    })
+    it('should append ellipsis when length is negative on empty string', function () {
+      return test('{{ "" | truncate: -1 }}', '...')
+    })
+    it('should raise invalid integer for non-integer length', async function () {
+      await test('{{ "x" | truncate: "abc" }}', {}, 'Liquid error (line 1): invalid integer', { inlineErrors: true })
+      await test('{{ "x" | truncate: nil }}', {}, 'Liquid error (line 1): invalid integer', { inlineErrors: true })
+    })
   })
   describe('truncatewords', function () {
     it('should truncate to 1 words if less than 1', function () {
@@ -268,17 +278,40 @@ describe('filters/string', function () {
     it('should allow multiple space chars between', function () {
       return test('{{ "1 \t2  3 \n4" | truncatewords: 3 }}', '1 2 3...')
     })
-    it('should show ellipsis if length is exactly len', function () {
-      return test('{{ "1 2 3" | truncatewords: 3 }}', '1 2 3...')
+    it('should not show ellipsis if word count equals len', function () {
+      return test('{{ "1 2 3" | truncatewords: 3 }}', '1 2 3')
     })
-    it('should default len to 15', function () {
-      return test('{{ "1 2 3 4 5 6 7 8 9 a b c d e f" | truncatewords }}', '1 2 3 4 5 6 7 8 9 a b c d e f...')
+    it('should default len to 15', async function () {
+      await test('{{ "1 2 3 4 5 6 7 8 9 a b c d e f" | truncatewords }}', '1 2 3 4 5 6 7 8 9 a b c d e f')
+      await test('{{ "1 2 3 4 5 6 7 8 9 a b c d e f g" | truncatewords }}', '1 2 3 4 5 6 7 8 9 a b c d e f...')
     })
     it('should ignore leading whitespace when counting words', function () {
       return test('{{ "  Ground control to Major Tom." | truncatewords: 3 }}', 'Ground control to...')
     })
     it('should keep trailing whitespace when not truncating', function () {
       return test('{{ "1 2 3 " | truncatewords: 5 }}', '1 2 3 ')
+    })
+    it('should split only on ASCII whitespace', function () {
+      return test('{{ "There is non\u202Fbreaking space" | truncatewords: 3 }}', 'There is non\u202Fbreaking...')
+    })
+    it('should return empty on nil input without coercing words', function () {
+      return test('{{ nil | truncatewords: nil }}', '')
+    })
+    it('should raise invalid integer for non-integer words', function () {
+      return test('{{ "x" | truncatewords: "abc" }}', {}, 'Liquid error (line 1): invalid integer', { inlineErrors: true })
+    })
+  })
+  describe('arity and empty-pattern edge cases', function () {
+    it('should raise wrong number of arguments on missing required argument', async function () {
+      await test('{{ "a-b-c" | split }}', {}, 'Liquid error (line 1): wrong number of arguments (given 1, expected 2)', { inlineErrors: true })
+      await test('{{ "abc" | upcase: 1 }}', {}, 'Liquid error (line 1): wrong number of arguments (given 2, expected 1)', { inlineErrors: true })
+    })
+    it('should split on runs of ASCII whitespace when separator is a single space', function () {
+      return test('{{ "\n\t50    kg\na b c" | split: " " | join: "|" }}', '50|kg|a|b|c')
+    })
+    it('should insert replacement around every code point when replace pattern is empty', async function () {
+      await test('{{ "hi" | replace: "", "x" }}', 'xhxix')
+      await test('{{ "" | replace: "", "Warranty" }}', 'Warranty')
     })
   })
   describe('remove_last', function () {
