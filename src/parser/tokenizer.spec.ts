@@ -1,4 +1,4 @@
-import { LiquidTagToken, HTMLToken, QuotedToken, OutputToken, TagToken, OperatorToken, RangeToken, PropertyAccessToken, NumberToken, IdentifierToken, FilteredValueToken } from '../tokens'
+import { LiquidTagToken, HTMLToken, QuotedToken, OutputToken, TagToken, OperatorToken, RangeToken, PropertyAccessToken, NumberToken, IdentifierToken, FilteredValueToken, LiteralToken } from '../tokens'
 import { Tokenizer } from './tokenizer'
 import { defaultOperators } from '../render/operator'
 import { createTrie } from '../util/operator-trie'
@@ -50,6 +50,32 @@ describe('Tokenizer', function () {
   })
   it('should read property access value', () => {
     expect(new Tokenizer('a[b]["c d"]').readValueOrThrow().getText()).toBe('a[b]["c d"]')
+  })
+  it('should treat literal with property access as variable lookup', () => {
+    const dot = new Tokenizer('blank.foo').readValueOrThrow() as PropertyAccessToken
+    expect(dot).toBeInstanceOf(PropertyAccessToken)
+    expect(dot.variable).toBeUndefined()
+    expect(dot.props).toHaveLength(2)
+    expect(dot.props[0]).toBeInstanceOf(IdentifierToken)
+    expect(dot.props[0].getText()).toBe('blank')
+    expect(dot.props[1]).toBeInstanceOf(IdentifierToken)
+    expect(dot.props[1].getText()).toBe('foo')
+
+    const bracket = new Tokenizer("empty['x']").readValueOrThrow() as PropertyAccessToken
+    expect(bracket).toBeInstanceOf(PropertyAccessToken)
+    expect(bracket.variable).toBeUndefined()
+    expect(bracket.props).toHaveLength(2)
+    expect(bracket.props[0]).toBeInstanceOf(IdentifierToken)
+    expect(bracket.props[0].getText()).toBe('empty')
+    expect(bracket.props[1]).toBeInstanceOf(QuotedToken)
+    expect(bracket.props[1].getText()).toBe("'x'")
+
+    const boolProp = new Tokenizer('true.foo').readValueOrThrow() as PropertyAccessToken
+    expect(boolProp).toBeInstanceOf(PropertyAccessToken)
+    expect(boolProp.variable).toBeUndefined()
+    expect(boolProp.props.map(p => p.getText())).toEqual(['true', 'foo'])
+
+    expect(new Tokenizer('blank').readValueOrThrow()).toBeInstanceOf(LiteralToken)
   })
   it('should read quoted property access value', () => {
     const value = new Tokenizer('["a prop"]').readValue()

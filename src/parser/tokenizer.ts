@@ -1,6 +1,6 @@
 import { FilteredValueToken, TagToken, HTMLToken, HashToken, QuotedToken, LiquidTagToken, OutputToken, ValueToken, Token, RangeToken, FilterToken, TopLevelToken, PropertyAccessToken, OperatorToken, LiteralToken, IdentifierToken, NumberToken } from '../tokens'
 import { OperatorHandler } from '../render/operator'
-import { LiteralValue, Trie, createTrie, ellipsis, literalValues, TokenizationError, TYPES, QUOTE, BLANK, NUMBER, SIGN, isWord, isString } from '../util'
+import { LiteralValue, Trie, createTrie, ellipsis, literalValues, TokenizationError, TYPES, QUOTE, BLANK, NUMBER, SIGN, isWord, isString, isLiteralToken } from '../util'
 import { Operators, Expression } from '../render'
 import { NormalizedFullOptions, defaultOptions } from '../liquid-options'
 import { FilterArg } from './filter-arg'
@@ -320,6 +320,10 @@ export class Tokenizer {
     }
     const props = this.readProperties(!variable)
     if (!props.length) return variable
+    if (isLiteralToken(variable)) {
+      props.unshift(new IdentifierToken(this.input, variable.begin, variable.end, this.file))
+      variable = undefined
+    }
     return new PropertyAccessToken(variable, props, this.input, begin, this.p)
   }
 

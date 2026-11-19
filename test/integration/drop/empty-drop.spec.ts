@@ -88,4 +88,17 @@ describe('drop/empty-drop', function () {
     const html = await liquid.parseAndRender(src)
     expect(html).toBe('false')
   })
+  it('resolves property lookup on variable named empty', async function () {
+    const html = await liquid.parseAndRender("{{ empty['x'] }}", { empty: { x: 'X' } })
+    expect(html).toBe('X')
+  })
+  it('evaluates standalone empty as literal even when empty is in scope or assigned', async function () {
+    expect(await liquid.parseAndRender('{{ empty }}', { empty: { x: 'X' } })).toBe('')
+    expect(await liquid.parseAndRender("{% assign empty = 'hi' %}{{ empty }}")).toBe('')
+  })
+  it('compares against EmptyDrop even when empty is in scope', async function () {
+    const src = '{% if x == empty %}empty{% else %}not empty{% endif %}'
+    const html = await liquid.parseAndRender(src, { x: [], empty: 'non-empty' })
+    expect(html).toBe('empty')
+  })
 })
