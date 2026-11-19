@@ -1,0 +1,20 @@
+src/filters/date.ts
+  h_f60b77838d081d 11-12,14,55
+test/integration/filters/date.spec.ts
+  h_f60b77838d081d 16-19
+src/util/strftime.spec.ts
+  h_f60b77838d081d 175-180
+src/util/strftime.ts
+  h_f60b77838d081d 48-60,67-68,79,106,108-110,128-129,132,135-136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a69b166b032ebed3a627b9d216182f99f263cb73",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
