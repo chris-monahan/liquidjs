@@ -33,6 +33,12 @@ Variables defined in the parent's scope can be passed to the partial template by
 {% include 'name', my_variable: my_variable, my_other_variable: 'oranges' %}
 ```
 
+Keyword arguments are evaluated from left to right inside the included scope, so later arguments can reference earlier ones:
+
+```liquid
+{% include 'name', a: 1, b: a %}
+```
+
 ## The `with` Parameter
 
 A single object can be passed to a snippet by using the `with...as` syntax:
@@ -42,7 +48,18 @@ A single object can be passed to a snippet by using the `with...as` syntax:
 {% include 'product' with featured_product as product %}
 ```
 
-In the example above, the `product` variable in the partial template will hold the value of `featured_product` in the parent template.
+In the example above, the `product` variable in the partial template will hold the value of `featured_product` in the parent template. If `as` is omitted, the variable defaults to the partial's basename (for example, `product` for `'snippets/product'`). If the bound value is an array, the partial is rendered once for each item.
+
+## The `for` Parameter
+
+A partial template can be rendered once for each element of an array by using the `for...as` syntax:
+
+```liquid
+{% assign variants = product.variants %}
+{% include 'variant' for variants as variant %}
+```
+
+If `as` is omitted, the variable defaults to the partial's basename. Unlike [`render`](./render.html), `include ... for` only iterates arrays, shares scope across iterations, and does not create a `forloop` object (preserving any outer `forloop`).
 
 ## Outputs & Filters
 
