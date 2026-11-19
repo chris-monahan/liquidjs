@@ -1,11 +1,50 @@
-import { stringify } from '../util/underscore'
+import { FilterImpl } from '../template'
+import { isKeyValuePair } from '../parser/filter-arg'
+import { LiquidRuntimeError } from '../util/error'
+import { isNil, stringify, toValue } from '../util/underscore'
 
 const rPercentEscapes = /(?:%[0-9A-Fa-f]{2})+/g
 
-export const url_decode = (x: string) => stringify(x)
-  .replace(/\+/g, ' ')
-  .replace(rPercentEscapes, decodeURIComponent)
-export const url_encode = (x: string) => encodeURIComponent(stringify(x)).replace(/%20/g, '+')
+function assertArity1 (impl: FilterImpl | void, rawArgs: unknown[]) {
+  const tokenArgs = impl?.token?.args
+  let extra = rawArgs.length
+  if (Array.isArray(tokenArgs) && tokenArgs.length === rawArgs.length) {
+    let pos = 0
+    let hasKw = false
+    for (let i = 0; i < tokenArgs.length; i++) {
+      if (isKeyValuePair(tokenArgs[i])) hasKw = true
+      else pos++
+    }
+    extra = pos + (hasKw ? 1 : 0)
+  }
+  if (extra > 0) {
+    throw new LiquidRuntimeError(`wrong number of arguments (given ${1 + extra}, expected 1)`)
+  }
+}
+
+export function url_decode (this: FilterImpl | void, x: string, ...rawArgs: unknown[]): string | null {
+  assertArity1(this, rawArgs)
+  if (isNil(toValue(x))) return null
+  const str = stringify(x)
+  this?.context?.memoryLimit.use(str.length)
+  return str
+    .replace(/\+/g, ' ')
+    .replace(rPercentEscapes, m => {
+      try {
+        return decodeURIComponent(m)
+      } catch {
+        throw new LiquidRuntimeError('invalid byte sequence in UTF-8')
+      }
+    })
+}
+
+export function url_encode (this: FilterImpl | void, x: string, ...rawArgs: unknown[]): string | null {
+  assertArity1(this, rawArgs)
+  if (isNil(toValue(x))) return null
+  const str = stringify(x)
+  this?.context?.memoryLimit.use(str.length)
+  return encodeURIComponent(str).replace(/%20/g, '+')
+}
 export const cgi_escape = (x: string) => encodeURIComponent(stringify(x))
   .replace(/%20/g, '+')
   .replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase())

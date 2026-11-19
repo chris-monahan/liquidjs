@@ -1,6 +1,15 @@
-import { isFalsy } from '../render/boolean'
+import { isFalsy, isTruthy } from '../render/boolean'
+import { EmptyDrop } from '../drop/empty-drop'
+import { isKeyValuePair } from '../parser/filter-arg'
+import { LiquidRuntimeError } from '../util/error'
 import { identify, isArray, isString, toValue } from '../util/underscore'
 import { FilterImpl } from '../template'
+
+function isPlainHash (val: unknown): val is Record<string, unknown> {
+  if (!val || typeof val !== 'object') return false
+  const proto = Object.getPrototypeOf(val)
+  return proto === null || proto === Object.prototype
+}
 
 function chargeJsonReplacerValue (memoryLimit: { use(count: number): void }, val: unknown) {
   if (typeof val === 'string') {
@@ -14,11 +23,45 @@ function chargeJsonReplacerValue (memoryLimit: { use(count: number): void }, val
   }
 }
 
-function defaultFilter<T1 extends boolean, T2> (this: FilterImpl, value: T1, defaultValue: T2, ...args: Array<[string, any]>): T1 | T2 {
-  value = toValue(value)
-  if (isArray(value) || isString(value)) return value.length ? value : defaultValue
-  if (value === false && (new Map(args)).get('allow_false')) return false as T1
-  return isFalsy(value, this.context) ? defaultValue : value
+function defaultFilter (this: FilterImpl, value: unknown, ...rawArgs: unknown[]): unknown {
+  const args: unknown[] = []
+  let kwargs: Record<string, unknown> | undefined
+  const tokenArgs = this?.token?.args
+  if (Array.isArray(tokenArgs) && tokenArgs.length === rawArgs.length) {
+    for (let i = 0; i < rawArgs.length; i++) {
+      if (isKeyValuePair(tokenArgs[i])) {
+        const [k, val] = rawArgs[i] as [string, unknown]
+        if (!kwargs) kwargs = {}
+        kwargs[k] = val
+      } else {
+        args.push(rawArgs[i])
+      }
+    }
+  } else {
+    for (const arg of rawArgs) {
+      if (isArray(arg) && arg.length === 2 && isString(arg[0])) {
+        if (!kwargs) kwargs = {}
+        kwargs[arg[0]] = arg[1]
+      } else {
+        args.push(arg)
+      }
+    }
+  }
+  if (kwargs) args.push(kwargs)
+  const given = 1 + args.length
+  if (given > 3) {
+    throw new LiquidRuntimeError(`wrong number of arguments (given ${given}, expected 1..3)`)
+  }
+  const defaultValue = args.length >= 1 ? args[0] : ''
+  const options = args.length >= 2 && isPlainHash(args[1]) ? args[1] : {}
+  const resolved = toValue(value)
+  if (isArray(resolved) || isString(resolved)) return resolved.length ? value : defaultValue
+  if (resolved instanceof EmptyDrop || (isPlainHash(resolved) && Object.keys(resolved).length === 0)) {
+    return defaultValue
+  }
+  const allowFalse = isTruthy(toValue(options.allow_false), this.context)
+  if (resolved === false && allowFalse) return false
+  return isFalsy(resolved, this.context) ? defaultValue : value
 }
 
 function json (this: FilterImpl, value: any, space = 0) {

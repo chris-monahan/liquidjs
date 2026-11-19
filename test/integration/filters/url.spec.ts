@@ -20,7 +20,12 @@ describe('filters/url', () => {
       expect(html).toEqual('✓ 100%')
     })
     it('should throw on escapes that are not valid UTF-8', () => {
-      expect(() => liquid.parseAndRenderSync('{{ "caf%C3%A9%ff" | url_decode }}')).toThrow('URI malformed')
+      expect(() => liquid.parseAndRenderSync('{{ "caf%C3%A9%ff" | url_decode }}')).toThrow('invalid byte sequence in UTF-8')
+      const inline = new Liquid({ inlineErrors: true })
+      expect(inline.parseAndRenderSync('{{ "caf%C3%A9%ff" | url_decode }}')).toEqual('Liquid error (line 1): invalid byte sequence in UTF-8')
+    })
+    it('should return nil when input is nil', () => {
+      expect(liquid.parseAndRenderSync('{{ nil | url_decode | json }}')).toEqual('null')
     })
   })
 
@@ -32,6 +37,9 @@ describe('filters/url', () => {
     it('should encode <space>', () => {
       const html = liquid.parseAndRenderSync('{{ "Tetsuro Takara" | url_encode }}')
       expect(html).toEqual('Tetsuro+Takara')
+    })
+    it('should return nil when input is nil', () => {
+      expect(liquid.parseAndRenderSync('{{ nil | url_encode | json }}')).toEqual('null')
     })
   })
 
