@@ -259,4 +259,37 @@ describe('tags/if', function () {
       })
     })
   })
+  describe('Ruby comparison, contains, and unknown operator semantics', function () {
+    const inline = new Liquid({ inlineErrors: true, rubyNumbers: true })
+
+    it('should raise comparison errors between numbers and strings', () => {
+      expect(inline.parseAndRenderSync('{% if 5 > "x" %}hit{% endif %}')).toBe('Liquid error (line 1): comparison of Integer with String failed')
+      expect(inline.parseAndRenderSync('{% if 1.0 < "a" %}hit{% endif %}')).toBe('Liquid error (line 1): comparison of Float with String failed')
+      expect(inline.parseAndRenderSync('{% if "abc" < 1 %}hit{% endif %}')).toBe('Liquid error (line 1): comparison of String with 1 failed')
+      expect(inline.parseAndRenderSync('{% if "hi" > 1.0 %}hit{% endif %}')).toBe('Liquid error (line 1): comparison of String with 1.0 failed')
+    })
+
+    it('should return false without error when comparing non-ordered types', () => {
+      expect(inline.parseAndRenderSync('{% if 5 > true %}Y{% else %}N{% endif %}')).toBe('N')
+      expect(inline.parseAndRenderSync('{% if a < b %}Y{% else %}N{% endif %}', { a: null, b: [1] })).toBe('N')
+      expect(inline.parseAndRenderSync('{% if a < b %}Y{% else %}N{% endif %}', { a: false, b: [1] })).toBe('N')
+      expect(inline.parseAndRenderSync('{% if a < b %}Y{% else %}N{% endif %}', { a: [1], b: [2] })).toBe('N')
+    })
+
+    it('should handle hash key membership and falsy targets in contains', () => {
+      expect(inline.parseAndRenderSync('{% if h contains "a" %}y{% else %}n{% endif %}', { h: { a: 1 } })).toBe('y')
+      expect(inline.parseAndRenderSync('{% if h contains 3 %}y{% else %}n{% endif %}', { h: { '3': 1 } })).toBe('n')
+      expect(inline.parseAndRenderSync('{% if a contains false %}y{% else %}n{% endif %}', { a: [false] })).toBe('n')
+      expect(inline.parseAndRenderSync('{% if a contains nil %}y{% else %}n{% endif %}', { a: [null] })).toBe('n')
+    })
+
+    it('should raise Unknown operator when evaluating a branch with an unknown operator', () => {
+      expect(inline.parseAndRenderSync('{% if true true %}{% else %}1{% endif %}')).toBe('Liquid error (line 1): Unknown operator true')
+      expect(inline.parseAndRenderSync('{% if false %}a{% elsif true true %}b{% endif %}')).toBe('Liquid error (line 1): Unknown operator true')
+      expect(inline.parseAndRenderSync('{% if true %}a{% elsif true true %}b{% endif %}')).toBe('a')
+      expect(inline.parseAndRenderSync('{% if blank foo %}1{% endif %}')).toBe('Liquid error (line 1): Unknown operator foo')
+      expect(inline.parseAndRenderSync('{% if dynamic and true true %}a{% else %}b{% endif %}', { dynamic: false })).toBe('b')
+      expect(inline.parseAndRenderSync('{% if dynamic and true true %}a{% else %}b{% endif %}', { dynamic: true })).toBe('Liquid error (line 1): Unknown operator true')
+    })
+  })
 })

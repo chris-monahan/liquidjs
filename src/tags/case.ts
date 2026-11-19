@@ -65,7 +65,6 @@ export default class extends Tag {
         if (yield equals(target, value)) {
           yield r.renderTemplates(branch.templates, ctx, emitter)
           branchHit = true
-          break
         }
       }
     }

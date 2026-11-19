@@ -1,38 +1,102 @@
 import { QuotedToken, RangeToken, OperatorToken, Token, PropertyAccessToken, OperatorType, operatorTypes, FilteredValueToken } from '../tokens'
-import { isRangeToken, isPropertyAccessToken, isFilteredValueToken, isNumberToken, UndefinedVariableError, isOperatorToken, assert, toValue } from '../util'
+import { isRangeToken, isPropertyAccessToken, isFilteredValueToken, isNumberToken, UndefinedVariableError, isOperatorToken, assert, LiquidRuntimeError, toValue } from '../util'
 import type { Context } from '../context'
 import type { UnaryOperatorHandler } from '../render'
+import { isTruthy } from './boolean'
 import { Drop } from '../drop'
 import { Filter } from '../template/filter'
 import { IdentifierToken } from '../tokens/identifier-token'
 import type { ValueToken } from '../tokens'
 import { LiquidRange } from '../util/liquid-range'
 
+interface Clause {
+  postfix: Token[];
+  unknownOperator?: string;
+  nextOp?: 'and' | 'or';
+}
+
+function detectUnknownOperator (tokens: Token[]): string | undefined {
+  let prevOperand = false
+  for (const token of tokens) {
+    if (isOperatorToken(token) && operatorTypes[token.operator] !== OperatorType.Unary) {
+      prevOperand = false
+    } else if (isOperatorToken(token)) {
+      if (prevOperand) return token.getText()
+      prevOperand = false
+    } else {
+      if (prevOperand) return token.getText()
+      prevOperand = true
+    }
+  }
+  return undefined
+}
+
+function buildClauses (tokens: Token[]): Clause[] {
+  const clauses: Clause[] = []
+  let current: Token[] = []
+  for (const token of tokens) {
+    if (isOperatorToken(token) && (token.operator === 'and' || token.operator === 'or')) {
+      clauses.push({
+        postfix: [...toPostfix(current)],
+        unknownOperator: detectUnknownOperator(current),
+        nextOp: token.operator
+      })
+      current = []
+    } else {
+      current.push(token)
+    }
+  }
+  clauses.push({
+    postfix: [...toPostfix(current)],
+    unknownOperator: detectUnknownOperator(current)
+  })
+  return clauses
+}
+
+function * evalPostfix (postfix: Token[], ctx: Context, lenient?: boolean): Generator<unknown, unknown, unknown> {
+  const operands: any[] = []
+  for (const token of postfix) {
+    if (isOperatorToken(token)) {
+      const r = operands.pop()
+      let result
+      if (operatorTypes[token.operator] === OperatorType.Unary) {
+        result = yield (ctx.opts.operators[token.operator] as UnaryOperatorHandler)(r, ctx)
+      } else {
+        const l = operands.pop()
+        result = yield ctx.opts.operators[token.operator](l, r, ctx)
+      }
+      operands.push(result)
+    } else {
+      operands.push(yield evalToken(token, ctx, lenient))
+    }
+  }
+  return operands[0]
+}
+
 export class Expression {
   readonly postfix: Token[]
+  private readonly clauses: Clause[]
 
   public constructor (tokens: Iterable<Token>) {
-    this.postfix = [...toPostfix(tokens)]
+    const raw = [...tokens]
+    this.postfix = [...toPostfix(raw)]
+    this.clauses = buildClauses(raw)
   }
-  public * evaluate (ctx: Context, lenient?: boolean): Generator<unknown, unknown, unknown> {
+  public * evaluate (ctx: Context, lenient?: boolean, checkUnknownOperator = false): Generator<unknown, unknown, unknown> {
     assert(ctx, 'unable to evaluate: context not defined')
-    const operands: any[] = []
-    for (const token of this.postfix) {
-      if (isOperatorToken(token)) {
-        const r = operands.pop()
-        let result
-        if (operatorTypes[token.operator] === OperatorType.Unary) {
-          result = yield (ctx.opts.operators[token.operator] as UnaryOperatorHandler)(r, ctx)
-        } else {
-          const l = operands.pop()
-          result = yield ctx.opts.operators[token.operator](l, r, ctx)
-        }
-        operands.push(result)
-      } else {
-        operands.push(yield evalToken(token, ctx, lenient))
+    for (const clause of this.clauses) {
+      if (checkUnknownOperator && clause.unknownOperator !== undefined) {
+        throw new LiquidRuntimeError(`Unknown operator ${clause.unknownOperator}`)
       }
+      const val = yield * evalPostfix(clause.postfix, ctx, lenient)
+      if (!clause.nextOp) {
+        return this.clauses.length === 1 ? val : isTruthy(yield toValue(val), ctx)
+      }
+      const truthy = isTruthy(yield toValue(val), ctx)
+      if (clause.nextOp === 'or' && truthy) return true
+      if (clause.nextOp === 'and' && !truthy) return false
     }
-    return operands[0]
+    return false
   }
   public valid () {
     return !!this.postfix.length
