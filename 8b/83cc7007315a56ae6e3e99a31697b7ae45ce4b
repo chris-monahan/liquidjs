@@ -1,0 +1,16 @@
+src/filters/array.ts
+  h_f60b77838d081d 367-417
+test/integration/filters/array.spec.ts
+  h_f60b77838d081d 4,395-398,413-465
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8b83cc7007315a56ae6e3e99a31697b7ae45ce4b",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
