@@ -1,5 +1,6 @@
 import { test, render } from '../../stub/render'
 import { Liquid } from '../../../src/liquid'
+import { Drop } from '../../../src/drop'
 
 describe('filters/array', function () {
   const engine = new Liquid()
@@ -25,6 +26,9 @@ describe('filters/array', function () {
       const src = '{% assign beatles = "John, Paul, George, Ringo" | split: ", " %}' +
         '{{ beatles | join " and " }}'
       return expect(render(src)).rejects.toThrow('expected ":" after filter name, line:1, col:83')
+    })
+    it('should flatten nested arrays', function () {
+      return test('{{ arr | join: ", " }}', { arr: ['a', ['b', ['c', 'd']]] }, 'a, b, c, d')
     })
   })
   describe('split', () => {
@@ -110,12 +114,56 @@ describe('filters/array', function () {
       const posts = [{ category: 'foo' }, { category: 'bar' }, { foo: 'bar' }]
       return test('{{posts | map: "category" | compact}}', { posts }, 'foobar')
     })
+    it('should flatten nested arrays', function () {
+      const arr = ['a', null, ['b', undefined, ['c']]]
+      return test('{{ arr | compact | join: "," }}', { arr }, 'a,b,c')
+    })
+    it('should compact by property', function () {
+      const posts = [
+        { title: 'A', category: 'foo' },
+        { title: 'B' },
+        { title: 'C', category: null },
+        { title: 'D', category: false }
+      ]
+      return test('{{ posts | compact: "category" | map: "title" | join: "," }}', { posts }, 'A,D')
+    })
+    it('should use literal key without dot-splitting for property', function () {
+      const items = [{ 'a.b': 1 }, { a: { b: 2 } }]
+      return test('{{ items | compact: "a.b" | json }}', { items }, '[{"a.b":1}]')
+    })
+    it('should support Drop items', async function () {
+      class PageDrop extends Drop {
+        constructor (public title: string, private cat: string | null) { super() }
+        async category () { return this.cat }
+      }
+      const pages = [new PageDrop('A', 'news'), new PageDrop('B', null), new PageDrop('C', 'tech')]
+      await test('{{ pages | compact: "category" | map: "title" | join: "," }}', { pages }, 'A,C')
+    })
+    it('should return empty array when input is empty with property', function () {
+      return test('{{ arr | compact: "category" | json }}', { arr: [] }, '[]')
+    })
+    it('should return null when item does not respond to brackets', async function () {
+      await test('{{ arr | compact: "a" | json }}', { arr: [{ a: 1 }, false] }, 'null')
+      await test('{{ arr | compact: "a" | json }}', { arr: [1.5] }, 'null')
+      await test('{{ arr | compact: "a" | json }}', { arr: [{ a: 1 }, null] }, 'null')
+    })
+    it('should throw on invalid bracket target', async function () {
+      await expect(render('{{ arr | compact: "a" }}', { arr: [1, 2] })).rejects.toThrow("cannot select the property 'a'")
+      await test('{{ arr | compact: "a" }}', { arr: [1, 2] }, "Liquid error (line 1): cannot select the property 'a'", { inlineErrors: true })
+    })
   })
 
   describe('concat', () => {
     it('should concat args value', async () => {
       const scope = { val: ['hey'], arr: ['foo', 'bar'] }
       await test('{{ val | concat: arr | join: "," }}', scope, 'hey,foo,bar')
+    })
+    it('should flatten nested left value', async () => {
+      const scope = { val: ['a', ['b', ['c']]], arr: ['d', 'e'] }
+      await test('{{ val | concat: arr | join: "," }}', scope, 'a,b,c,d,e')
+    })
+    it('should throw when argument is not an array', async () => {
+      await expect(render('{{ val | concat: 10 }}', { val: ['a'] })).rejects.toThrow('concat filter requires an array argument')
     })
     it('should support undefined left value', async () => {
       const scope = { arr: ['foo', 'bar'] }
@@ -212,6 +260,11 @@ describe('filters/array', function () {
       const html = await render('{{ arr | join: "" }}', scope)
       expect(html).toBe('abc')
     })
+    it('should flatten nested arrays', () => test(
+      '{{ arr | reverse | join: "," }}',
+      { arr: ['a', ['b', ['c']]] },
+      'c,b,a'
+    ))
   })
   describe('sample', function () {
     it('should return one item if count not specified', async () => {
@@ -480,6 +533,70 @@ describe('filters/array', function () {
     })
     it('should uniq falsy value', function () {
       return test('{{"" | uniq | join: ","}}', '')
+    })
+    it('should flatten nested arrays', function () {
+      return test('{{ arr | uniq | join: "," }}', { arr: ['a', ['b', 'a', ['c', 'b']]] }, 'a,b,c')
+    })
+    it('should uniq by property', function () {
+      const items = [
+        { id: 1, name: 'a' },
+        { id: 2, name: 'b' },
+        { id: 3, name: 'a' }
+      ]
+      return test('{{ items | uniq: "name" | map: "id" | join: "," }}', { items }, '1,2')
+    })
+    it('should deduplicate missing and null property values together', function () {
+      const items = [
+        { id: 1 },
+        { id: 2, name: null },
+        { id: 3, name: 'a' }
+      ]
+      return test('{{ items | uniq: "name" | map: "id" | join: "," }}', { items }, '1,3')
+    })
+    it('should use literal key without dot-splitting', function () {
+      const items = [
+        { id: 1, 'a.b': 'x' },
+        { id: 2, 'a.b': 'x' },
+        { id: 3, a: { b: 'y' } },
+        { id: 4, a: { b: 'z' } }
+      ]
+      return test('{{ items | uniq: "a.b" | map: "id" | join: "," }}', { items }, '1,3')
+    })
+    it('should support string items with property', function () {
+      return test('{{ items | uniq: "a" | join: "," }}', { items: ['abc', 'def', 'axc', 'xyz'] }, 'abc,def')
+    })
+    it('should support Drop items sync and async', async function () {
+      class ItemDrop extends Drop {
+        constructor (public id: number, private k: string) { super() }
+        key () { return this.k }
+      }
+      const items = [new ItemDrop(1, 'x'), new ItemDrop(2, 'x'), new ItemDrop(3, 'y')]
+      expect(engine.parseAndRenderSync('{{ items | uniq: "key" | map: "id" | join: "," }}', { items })).toBe('1,3')
+      await test('{{ items | uniq: "key" | map: "id" | join: "," }}', { items }, '1,3')
+    })
+    it('should respect ownPropertyOnly with property', async function () {
+      const a = Object.create({ secret: 'x' })
+      a.id = 1
+      const b = Object.create({ secret: 'y' })
+      b.id = 2
+      await test('{{ items | uniq: "secret" | map: "id" | join: "," }}', { items: [a, b] }, '1', { ownPropertyOnly: true })
+      await test('{{ items | uniq: "secret" | map: "id" | join: "," }}', { items: [a, b] }, '1,2', { ownPropertyOnly: false })
+    })
+    it('should return input as-is when length <= 1 with property', async function () {
+      await test('{{ arr | uniq: "a" | json }}', { arr: [] }, '[]')
+      await test('{{ arr | uniq: "a" | json }}', { arr: [1] }, '[1]')
+      await test('{{ arr | uniq: "a" | json }}', { arr: [true] }, '[true]')
+    })
+    it('should return null when item does not respond to brackets', async function () {
+      await test('{{ arr | uniq: "a" | json }}', { arr: [{ a: 1 }, true] }, 'null')
+      await test('{{ arr | uniq: "a" | json }}', { arr: [1.5, 2.5] }, 'null')
+      await test('{{ arr | uniq: "a" | json }}', { arr: [{ a: 1 }, null] }, 'null')
+    })
+    it('should throw on invalid bracket target', async function () {
+      await expect(render('{{ arr | uniq: "a" }}', { arr: [1, 2] })).rejects.toThrow("cannot select the property 'a'")
+      await expect(render('{{ arr | uniq: prop }}', { arr: [1, 2], prop: [1, 'b'] })).rejects.toThrow('cannot select the property \'[1, "b"]\'')
+      await expect(render('{{ arr | uniq: prop }}', { arr: [1, 2], prop: { a: 1 } })).rejects.toThrow('cannot select the property \'{"a"=>1}\'')
+      await test('{{ arr | uniq: "a" }}', { arr: [1, 2] }, "Liquid error (line 1): cannot select the property 'a'", { inlineErrors: true })
     })
   })
   describe('where', function () {
