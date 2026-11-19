@@ -91,7 +91,7 @@ export interface LiquidOptions {
   orderedFilterParameters?: boolean;
   /** Allow parenthesized expressions as operands in conditions and loops, e.g. `{% if (foo | upcase) == "BAR" %}`. This is a non-standard extension to Liquid. Defaults to `false`. */
   groupedExpressions?: boolean;
-  /** Tags whose content is output as-is until the matching `end` tag, like `raw`. Defaults to `['raw']`. */
+  /** Tags whose content is not parsed as Liquid until the matching `end` tag, like `raw` and `doc`. Defaults to `['raw', 'doc']`. */
   rawTags?: string[];
   /** Distinguish integers from floats and follow Shopify/liquid's number semantics: `1.5` literals are floats, `{{ 2.0 }}` renders `2.0`, and math filters use Ruby's rules (`10 | divided_by: 4` is `2`, `0.1 | plus: 0.2` is `0.3`). Wrap floats in data with `LiquidFloat`. Defaults to `false`. */
   rubyNumbers?: boolean;
@@ -223,7 +223,7 @@ export const defaultOptions: NormalizedFullOptions = {
   keepOutputType: false,
   operators: defaultOperators,
   groupedExpressions: false,
-  rawTags: ['raw'],
+  rawTags: ['raw', 'doc'],
   rubyNumbers: false,
   inlineErrors: false,
   suppressBlankTagErrors: false,

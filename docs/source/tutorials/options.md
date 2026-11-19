@@ -146,12 +146,12 @@ Nonexistent tags always throw errors during parsing and this behavior cannot be 
 
 ## Raw Tags
 
-**rawTags** lists tags whose content is output as-is until the matching end tag, the way [raw][raw-tag] works. Liquid inside them isn't parsed, so they can hold content that isn't valid Liquid, like the JSON in Shopify's `{%raw%}{% schema %}{%endraw%}` tag. Defaults to `['raw']`.
+**rawTags** lists tags whose content is output as-is until the matching end tag, the way [raw][raw-tag] works. Liquid inside them isn't parsed, so they can hold content that isn't valid Liquid, like the JSON in Shopify's `{%raw%}{% schema %}{%endraw%}` tag. Defaults to `['raw', 'doc']`.
 
 Each listed tag still needs an implementation, registered with [registerTag][register-tags]; its content arrives as a single HTML token:
 
 ```javascript
-const engine = new Liquid({ rawTags: ['raw', 'schema'] })
+const engine = new Liquid({ rawTags: ['raw', 'doc', 'schema'] })
 engine.registerTag('schema', {
   parse (token, remainTokens) {
     this.content = ''
