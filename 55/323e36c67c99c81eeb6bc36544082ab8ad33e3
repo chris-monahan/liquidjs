@@ -1,0 +1,30 @@
+docs/source/_data/sidebar.yml
+  h_f60b77838d081d 125
+docs/source/tags/doc.md
+  h_f60b77838d081d 1-26
+docs/source/tags/overview.md
+  h_f60b77838d081d 16
+docs/source/tutorials/options.md
+  h_f60b77838d081d 149,154
+src/liquid-options.ts
+  h_f60b77838d081d 92,208
+src/tags/doc.ts
+  h_f60b77838d081d 1-34
+src/tags/index.ts
+  h_f60b77838d081d 6,31,50
+test/integration/liquid/raw-tags-option.spec.ts
+  h_f60b77838d081d 32-37
+test/integration/tags/doc.spec.ts
+  h_f60b77838d081d 1-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "55323e36c67c99c81eeb6bc36544082ab8ad33e3",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
