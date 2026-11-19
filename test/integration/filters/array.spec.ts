@@ -1,6 +1,7 @@
 import { test, render } from '../../stub/render'
 import { Liquid } from '../../../src/liquid'
 import { Drop } from '../../../src/drop'
+import { LiquidRuntimeError, RenderError } from '../../../src/util'
 
 describe('filters/array', function () {
   const engine = new Liquid()
@@ -449,7 +450,10 @@ describe('filters/array', function () {
     it('should slice substr by -3,2', () => test('{{ "Liquid" | slice: -3, 2 }}', 'ui'))
     it('should slice substr by -2,2', () => test('{{ "abc" | slice: -2, 2 }}', 'bc'))
     it('should support array', () => test('{{ "1,2,3,4" | split: "," | slice: 1,2 | join }}', '2 3'))
-    it('should return empty array for nil value', () => test('{{ nil | slice: 0 }}', ''))
+    it('should return empty string for nil value', async () => {
+      await test('{{ nil | slice: 0 }}', '')
+      await test('{{ nil | slice: 0 | json }}', '""')
+    })
     it('should return empty when begin is out of negative range', () => test('{{ "hello" | slice: -10, 2 }}', ''))
     it('should return empty when length is negative', () => test('{{ "Liquid" | slice: 1, -2 }}', ''))
     it('should slice a surrogate pair as one character', () => test('{{ "a😀b" | slice: 1, 1 }}', '😀'))
@@ -464,6 +468,59 @@ describe('filters/array', function () {
     it('should slice ZWJ sequences by code points', () => test('{{ s | slice: 1, 1 }}', { s: '\u{1F468}‍\u{1F469}' }, '‍'))
     it('should keep a lone surrogate in the input', () => test('{{ s | slice: 1, 1 }}', { s: 'a\ud83db' }, '\ud83d'))
     it('should return empty array when begin is out of negative range', () => test('{{ "1,2,3,4,5" | split: "," | slice: -10, 2 | join: "," }}', ''))
+    it('should support string integer arguments', async () => {
+      await test('{{ "Liquid" | slice: "1", "3" }}', 'iqu')
+      await test('{{ "Liquid" | slice: "-2", "2" }}', 'id')
+      await test('{{ "Liquid" | slice: " 2 \n", "0x2" }}', 'qu')
+      await test('{{ "0123456789ab" | slice: "0o2", "1_0" }}', '23456789ab')
+      await test('{{ "Liquid" | slice: "-0b10", "0d2" }}', 'id')
+      await test('{{ "0123456789" | slice: "02", "0_3" }}', '234')
+    })
+    it('should default nil or false length to 1', async () => {
+      await test('{{ "Liquid" | slice: 2, nil }}', 'q')
+      await test('{{ "Liquid" | slice: 2, false }}', 'q')
+      await test('{{ arr | slice: 1, nil | json }}', { arr: ['a', 'b', 'c'] }, '["b"]')
+      await test('{{ arr | slice: 1, false | json }}', { arr: ['a', 'b', 'c'] }, '["b"]')
+    })
+    it('should unwrap Drop and boxed primitive integer arguments', async () => {
+      class AsyncOffsetDrop extends Drop {
+        async valueOf () { return 1 }
+      }
+      class StringLengthDrop extends Drop {
+        toString () { return '3' }
+      }
+      await test('{{ "Liquid" | slice: off, len }}', { off: new AsyncOffsetDrop(), len: new StringLengthDrop() }, 'iqu')
+      await test('{{ "Liquid" | slice: off, len }}', { off: Object(2), len: Object('2') }, 'qu')
+    })
+    it('should throw LiquidRuntimeError on wrong number of arguments', async () => {
+      await expect(render('{{ "Liquid" | slice }}')).rejects.toThrow('wrong number of arguments (given 1, expected 2..3)')
+      await expect(render('{{ "Liquid" | slice: 0, 1, 2 }}')).rejects.toThrow('wrong number of arguments (given 4, expected 2..3)')
+      await test('{{ "Liquid" | slice }}', {}, 'Liquid error (line 1): wrong number of arguments (given 1, expected 2..3)', { inlineErrors: true })
+    })
+    it('should throw LiquidRuntimeError on non-integer offset or length', async () => {
+      let caught: unknown
+      try {
+        await render('{{ "Liquid" | slice: "abc" }}')
+      } catch (err) {
+        caught = err
+      }
+      expect(caught).toBeInstanceOf(RenderError)
+      expect((caught as RenderError).originalError).toBeInstanceOf(LiquidRuntimeError)
+      expect((caught as RenderError).originalError?.message).toBe('invalid integer')
+      await expect(render('{{ "Liquid" | slice: 2.5 }}')).rejects.toThrow('invalid integer')
+      await expect(render('{{ "Liquid" | slice: nil }}')).rejects.toThrow('invalid integer')
+      await expect(render('{{ nil | slice: nil }}')).rejects.toThrow('invalid integer')
+      await expect(render('{{ "Liquid" | slice: 0, "abc" }}')).rejects.toThrow('invalid integer')
+      await expect(render('{{ "Liquid" | slice: 0, 2.5 }}')).rejects.toThrow('invalid integer')
+      await expect(render('{{ "Liquid" | slice: 0, true }}')).rejects.toThrow('invalid integer')
+      await expect(render('{{ "Liquid" | slice: "1__0" }}')).rejects.toThrow('invalid integer')
+      await expect(render('{{ "Liquid" | slice: "08" }}')).rejects.toThrow('invalid integer')
+      await expect(render('{{ "Liquid" | slice: "\u00a01" }}')).rejects.toThrow('invalid integer')
+      await test('{{ "Liquid" | slice: "abc" }}', {}, 'Liquid error (line 1): invalid integer', { inlineErrors: true })
+      await test('{{ "Liquid" | slice: 2.5 }}', {}, 'Liquid error (line 1): invalid integer', { inlineErrors: true })
+      await test('{{ "Liquid" | slice: nil }}', {}, 'Liquid error (line 1): invalid integer', { inlineErrors: true })
+      await test('{{ "Liquid" | slice: 0, true }}', {}, 'Liquid error (line 1): invalid integer', { inlineErrors: true })
+    })
   })
   describe('sort', function () {
     it('should support sort', function () {

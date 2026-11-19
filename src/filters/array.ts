@@ -364,16 +364,57 @@ export function shift<T> (this: FilterImpl, v: T[]): T[] {
   return clone
 }
 
-export function slice<T> (this: FilterImpl, v: T[] | string, begin: number, length = 1): T[] | string {
-  v = toValue(v)
-  if (isNil(v)) return []
-  if (!isArray(v)) v = stringify(v)
-  begin = begin < 0 ? (isArray(v) ? v.length : codePointLength(v)) + begin : begin
-  if (begin < 0 || length < 0) return isArray(v) ? [] : ''
-  this.context.memoryLimit.use(length)
-  if (isArray(v)) return Array.prototype.slice.call(v, begin, begin + length)
-  const start = advanceCodePoints(v, 0, begin)
-  return v.slice(start, advanceCodePoints(v, start, length))
+function parseSliceInteger (value: unknown): number {
+  value = toLiquid(value)
+  if (value instanceof Drop) {
+    const unwrapped = isFunction(value.valueOf) ? value.valueOf() : value
+    if (unwrapped !== value) value = unwrapped
+    else if (isFunction(value.toString) && value.toString !== Object.prototype.toString) value = value.toString()
+  }
+  if (value instanceof Number || value instanceof String || value instanceof Boolean) {
+    value = value.valueOf()
+  }
+  if (typeof value === 'number') {
+    if (Number.isInteger(value)) return value === 0 ? 0 : value
+    throw new LiquidRuntimeError('invalid integer')
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.replace(/^[ \t\n\r\f\v]+|[ \t\n\r\f\v]+$/g, '')
+    const match = /^([+-]?)(?:0[xX]([0-9a-fA-F](?:_?[0-9a-fA-F])*)|0[bB]([01](?:_?[01])*)|0[oO]([0-7](?:_?[0-7])*)|0[dD]([0-9](?:_?[0-9])*)|0((?:_?[0-7])*)|([1-9](?:_?[0-9])*))$/.exec(trimmed)
+    if (!match) throw new LiquidRuntimeError('invalid integer')
+    const sign = match[1] === '-' ? -1 : 1
+    let mag: number
+    if (match[2] !== undefined) mag = parseInt(match[2].replace(/_/g, ''), 16)
+    else if (match[3] !== undefined) mag = parseInt(match[3].replace(/_/g, ''), 2)
+    else if (match[4] !== undefined) mag = parseInt(match[4].replace(/_/g, ''), 8)
+    else if (match[5] !== undefined) mag = parseInt(match[5].replace(/_/g, ''), 10)
+    else if (match[6] !== undefined) mag = parseInt('0' + match[6].replace(/_/g, ''), 8)
+    else mag = parseInt(match[7].replace(/_/g, ''), 10)
+    const n = sign * mag
+    if (n > Number.MAX_SAFE_INTEGER) return Number.MAX_SAFE_INTEGER
+    if (n < -Number.MAX_SAFE_INTEGER) return -Number.MAX_SAFE_INTEGER
+    return n === 0 ? 0 : n
+  }
+  throw new LiquidRuntimeError('invalid integer')
+}
+
+export function * slice<T> (this: FilterImpl, v: T[] | string, offset?: unknown, length?: unknown): IterableIterator<unknown> {
+  if (arguments.length < 2) throw new LiquidRuntimeError('wrong number of arguments (given 1, expected 2..3)')
+  if (arguments.length > 3) throw new LiquidRuntimeError(`wrong number of arguments (given ${arguments.length}, expected 2..3)`)
+  let begin = parseSliceInteger(yield toValue(toLiquid(offset)))
+  let rawLen: unknown = yield toValue(toLiquid(length))
+  if (rawLen instanceof Boolean) rawLen = rawLen.valueOf()
+  const len = (arguments.length < 3 || isNil(rawLen) || rawLen === false) ? 1 : parseSliceInteger(rawLen)
+  const rawInput = yield toValue(toLiquid(v))
+  const input: T[] | string = isArray(rawInput) ? rawInput : stringify(rawInput)
+  const total = isArray(input) ? input.length : codePointLength(input)
+  begin = begin < 0 ? total + begin : begin
+  if (begin < 0 || begin > total || len < 0) return isArray(input) ? [] : ''
+  const clampedLen = Math.min(len, total - begin)
+  this.context.memoryLimit.use(clampedLen)
+  if (isArray(input)) return Array.prototype.slice.call(input, begin, begin + clampedLen)
+  const start = advanceCodePoints(input, 0, begin)
+  return input.slice(start, advanceCodePoints(input, start, clampedLen))
 }
 
 function * matches (this: FilterImpl, value: unknown, expected: unknown): Generator<unknown, boolean, any> {
