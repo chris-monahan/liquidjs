@@ -1,0 +1,20 @@
+docs/source/tags/for.md
+  h_f60b77838d081d 147-165
+src/drop/forloop-drop.ts
+  h_f60b77838d081d 7-8,12-15
+src/tags/for.ts
+  h_f60b77838d081d 70-73,75-84,86
+test/integration/tags/for.spec.ts
+  h_f60b77838d081d 446-518
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "787392db19837f927c6c67aed6e689ea9287782e",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
