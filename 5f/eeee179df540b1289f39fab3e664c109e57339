@@ -1,0 +1,16 @@
+src/filters/array.ts
+  h_f60b77838d081d 2,73-153,240-241,243-248,252-254,260,264,270-271,273,275-286,389-396,416-417,421-422,462-464,466-469,471,485-486,488,496-497,499,507-508,510
+test/integration/filters/array.spec.ts
+  h_f60b77838d081d 73-123,514-526,589-592,811-828,944-949,1090-1098,1137-1139,1142-1145,1162,1165-1172,1211-1213,1216-1219,1232,1235-1242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5feeee179df540b1289f39fab3e664c109e57339",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
