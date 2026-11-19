@@ -13,7 +13,7 @@ export default class extends Tag {
   private currentFile?: string
   constructor (token: TagToken, remainTokens: TopLevelToken[], liquid: Liquid, parser: Parser) {
     super(token, remainTokens, liquid)
-    this.file = parseFilePath(this.tokenizer, this.liquid, parser)
+    this.file = parseFilePath(this.tokenizer, this.liquid, parser, true)
     this.currentFile = token.file
     this.args = new Hash(this.tokenizer, liquid.options.keyValueSeparator)
     this.templates = parser.parseTokens(remainTokens)

@@ -78,7 +78,7 @@ A single object can be passed to a snippet by using the `with...as` syntax:
 {% render 'product' with featured_product as product %}
 ```
 
-In the example above, the `product` variable in the partial template will hold the value of `featured_product` in the parent template.
+In the example above, the `product` variable in the partial template will hold the value of `featured_product` in the parent template. If `as` is omitted, the variable defaults to the partial's basename (for example, `product` for `'snippets/product'`).
 
 ### The `for` Parameter
 
@@ -89,7 +89,7 @@ A partial template can be rendered once for each value of an enumerable by using
 {% render 'variant' for variants as variant %}
 ```
 
-In the example above, the partial template will be rendered once for each `variant` of the `product`, and the `variant` variable will hold a product's variant object within the snippet.
+In the example above, the partial template will be rendered once for each `variant` of the `product`, and the `variant` variable will hold a product's variant object within the snippet. If `as` is omitted, the variable defaults to the partial's basename (for example, `variant` for `'snippets/variant'`).
 
 {% note tip The forloop object %} When using the for parameter, the <a href="./for.html#forloop">forloop</a> object is accessible within the snippet.{% endnote %}
 

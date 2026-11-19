@@ -1,85 +1,73 @@
 import { __assign } from 'tslib'
-import { ForloopDrop } from '../drop'
-import { isString, isValueToken, toEnumerable } from '../util'
-import { TopLevelToken, assert, Liquid, Token, ValueToken, Template, evalQuotedToken, TypeGuards, Tokenizer, evalToken, Hash, Emitter, TagToken, Context, Tag } from '..'
+import { Drop, ForloopDrop, NullDrop } from '../drop'
+import { isArray, isIterable, isNil, isObject, isString, isValueToken, toValue } from '../util'
+import { TopLevelToken, assert, Liquid, Token, ValueToken, Template, evalQuotedToken, TypeGuards, Tokenizer, evalToken, evalTokenValue, Hash, Emitter, TagToken, Context, Tag } from '..'
 import { Parser } from '../parser'
 import { Argument, Arguments, PartialScope } from '../template'
 
 export type ParsedFileName = Template[] | Token | string | undefined
 
-type RenderBinding = { value: ValueToken; alias?: string }
+export type PartialBinding = { keyword: 'with' | 'for'; value: ValueToken; alias?: string }
 
 export default class extends Tag {
   private file: ParsedFileName
   private currentFile?: string
   private hash: Hash
-  private with?: RenderBinding
-  private forBinding?: RenderBinding
+  private with?: PartialBinding
+  private forBinding?: PartialBinding
   constructor (token: TagToken, remainTokens: TopLevelToken[], liquid: Liquid, parser: Parser) {
     super(token, remainTokens, liquid)
     const tokenizer = this.tokenizer
     this.file = parseFilePath(tokenizer, this.liquid, parser)
     this.currentFile = token.file
     while (!tokenizer.end()) {
-      tokenizer.skipBlank()
-      const begin = tokenizer.p
-      const keyword = tokenizer.readIdentifier()
-      if (keyword.content === 'with' || keyword.content === 'for') {
-        tokenizer.skipBlank()
-        // can be normal key/value pair, like "with: true"
-        if (tokenizer.peek() !== ':') {
-          const value = tokenizer.readValue()
-          // can be normal key, like "with,"
-          if (value) {
-            const beforeAs = tokenizer.p
-            const asStr = tokenizer.readIdentifier()
-            let alias
-            if (asStr.content === 'as') alias = tokenizer.readIdentifier()
-            else tokenizer.p = beforeAs
-
-            const binding: RenderBinding = { value, alias: alias && alias.content }
-            if (keyword.content === 'with') this.with = binding
-            else this.forBinding = binding
-            tokenizer.skipBlank()
-            if (tokenizer.peek() === ',') tokenizer.advance()
-            continue // matched!
-          }
-        }
-      }
-      /**
-       * restore cursor if with/for not matched
-       */
-      tokenizer.p = begin
-      break
+      const binding = parsePartialBinding(tokenizer)
+      if (!binding) break
+      if (binding.keyword === 'with') this.with = binding
+      else this.forBinding = binding
     }
     this.hash = new Hash(tokenizer, liquid.options.keyValueSeparator)
   }
   * render (ctx: Context, emitter: Emitter): Generator<unknown, void, unknown> {
-    const { liquid, hash } = this
+    const { liquid, hash, forBinding } = this
+    const withBinding = this.with
     const filepath = (yield renderFilePath(this.file, ctx, liquid)) as string
-    assert(filepath, () => `illegal file path "${filepath}"`)
+    assert(isString(filepath), () => `illegal file path "${filepath}"`)
+    const templates = (yield liquid._parsePartialFile(filepath, ctx.sync, this.currentFile)) as Template[]
+    const defaultAlias = partialBasename(filepath)
 
-    const childCtx = ctx.spawn()
-    const scope = childCtx.bottom()
-    __assign(scope, yield hash.render(ctx))
-    if (this.with) {
-      const { value, alias } = this.with
-      scope[alias || filepath] = yield evalToken(value, ctx)
+    function * renderOne (hasFor: boolean, forItem: unknown, forloop?: ForloopDrop): Generator<unknown, void, unknown> {
+      const childCtx = ctx.spawn()
+      childCtx.setRegister('disallowInclude', true)
+      const scope = childCtx.bottom()
+      if (forloop) scope['forloop'] = forloop
+      __assign(scope, yield hash.render(ctx))
+      if (withBinding) {
+        const val = yield evalToken(withBinding.value, ctx)
+        if (!isLiquidNil(val)) scope[withBinding.alias || defaultAlias] = val
+      }
+      if (hasFor && !isLiquidNil(forItem)) {
+        scope[forBinding!.alias || defaultAlias] = forItem
+      }
+      yield liquid.renderer.renderTemplates(templates, childCtx, emitter)
     }
 
-    if (this.forBinding) {
-      const { value, alias } = this.forBinding
-      const collection = toEnumerable(yield evalToken(value, ctx))
-      scope['forloop'] = new ForloopDrop(collection.length, value.getText(), alias as string)
-      for (const item of collection) {
-        scope[alias as string] = item
-        const templates = (yield liquid._parsePartialFile(filepath, childCtx.sync, this.currentFile)) as Template[]
-        yield liquid.renderer.renderTemplates(templates, childCtx, emitter)
-        scope['forloop'].next()
+    if (forBinding) {
+      const raw = yield evalToken(forBinding.value, ctx)
+      const unwrapped = raw instanceof Drop ? yield toValue(raw) : toValue(raw)
+      const list = toRenderForList(unwrapped)
+      if (list !== undefined) {
+        const forloop = new ForloopDrop(list.length, forBinding.value.getText(), forBinding.alias || defaultAlias)
+        forloop.name = filepath
+        for (const item of list) {
+          yield * renderOne(true, item, forloop)
+          forloop.next()
+        }
+      } else {
+        yield * renderOne(true, raw)
       }
     } else {
-      const templates = (yield liquid._parsePartialFile(filepath, childCtx.sync, this.currentFile)) as Template[]
-      yield liquid.renderer.renderTemplates(templates, childCtx, emitter)
+      yield * renderOne(false, undefined)
     }
   }
 
@@ -96,20 +84,12 @@ export default class extends Tag {
 
       if (this.with) {
         const { value, alias } = this.with
-        if (isString(alias)) {
-          names.push([alias, value])
-        } else if (isString(this.file)) {
-          names.push([this.file, value])
-        }
+        names.push([alias || partialBasename(this.file), value])
       }
 
       if (this.forBinding) {
         const { value, alias } = this.forBinding
-        if (isString(alias)) {
-          names.push([alias, value])
-        } else if (isString(this.file)) {
-          names.push([this.file, value])
-        }
+        names.push([alias || partialBasename(this.file), value])
       }
 
       return { name: this.file, isolated: true, scope: names }
@@ -139,17 +119,69 @@ export default class extends Tag {
   }
 }
 
+export function partialBasename (filepath: string): string {
+  return filepath.split('/').filter(Boolean).pop() || filepath
+}
+
+export function parsePartialBinding (tokenizer: Tokenizer): PartialBinding | undefined {
+  tokenizer.skipBlank()
+  const begin = tokenizer.p
+  const keyword = tokenizer.readIdentifier()
+  if (keyword.content === 'with' || keyword.content === 'for') {
+    tokenizer.skipBlank()
+    if (tokenizer.peek() !== ':') {
+      const value = tokenizer.readValue()
+      if (value) {
+        const beforeAs = tokenizer.p
+        const asStr = tokenizer.readIdentifier()
+        let alias: string | undefined
+        if (asStr.content === 'as') {
+          tokenizer.skipBlank()
+          if (tokenizer.peek() !== ':') {
+            alias = tokenizer.readIdentifier().content || undefined
+          } else {
+            tokenizer.p = beforeAs
+          }
+        } else {
+          tokenizer.p = beforeAs
+        }
+        tokenizer.skipBlank()
+        if (tokenizer.peek() === ',') tokenizer.advance()
+        return { keyword: keyword.content, value, alias }
+      }
+    }
+  }
+  tokenizer.p = begin
+}
+
+function isLiquidNil (val: unknown): boolean {
+  return isNil(val) || val instanceof NullDrop
+}
+
+function toRenderForList (val: unknown): unknown[] | undefined {
+  const v = val instanceof Drop ? val.valueOf() : toValue(val)
+  if (isArray(v)) return v
+  if (isString(v) && v.length > 0) return [v]
+  if (isIterable(v)) return Array.from(v)
+  if (isObject(v)) {
+    const proto = Object.getPrototypeOf(v)
+    if (proto === null || proto === Object.prototype) {
+      return Object.keys(v).map(k => [k, (v as Record<string, unknown>)[k]])
+    }
+  }
+}
+
 /**
- * @return null for "none",
+ * @return undefined for "none" when allowNone is true
  * @return Template[] for quoted with tags and/or filters
  * @return Token for expression (not quoted)
  * @throws TypeError if cannot read next token
  */
-export function parseFilePath (tokenizer: Tokenizer, liquid: Liquid, parser: Parser): ParsedFileName {
+export function parseFilePath (tokenizer: Tokenizer, liquid: Liquid, parser: Parser, allowNone = false): ParsedFileName {
   if (liquid.options.dynamicPartials) {
     const file = tokenizer.readValue()
     tokenizer.assert(file, 'illegal file path')
-    if (file!.getText() === 'none') return
+    if (allowNone && file!.getText() === 'none') return
     if (TypeGuards.isQuotedToken(file)) {
       // for filenames like "files/{{file}}", eval as liquid template
       const templates = parser.parse(evalQuotedToken(file))
@@ -159,7 +191,7 @@ export function parseFilePath (tokenizer: Tokenizer, liquid: Liquid, parser: Par
   }
   const tokens = [...tokenizer.readFileNameTemplate(liquid.options)]
   const templates = optimize(parser.parseTokens(tokens))
-  return templates === 'none' ? undefined : templates
+  return allowNone && templates === 'none' ? undefined : templates
 }
 
 function optimize (templates: Template[]): string | Template[] {
@@ -171,5 +203,5 @@ function optimize (templates: Template[]): string | Template[] {
 export function * renderFilePath (file: ParsedFileName, ctx: Context, liquid: Liquid): IterableIterator<unknown> {
   if (typeof file === 'string') return file
   if (Array.isArray(file)) return liquid.renderer.renderTemplates(file, ctx)
-  return yield evalToken(file, ctx)
+  return yield evalTokenValue(file, ctx)
 }
