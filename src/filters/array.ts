@@ -1,17 +1,148 @@
-import { toArray, argumentsToValue, toValue, stringify, caseInsensitiveCompare, orderedCompare, isArray, isNil, isArrayLike, readArrayElement, toEnumerable, advanceCodePoints, codePointLength } from '../util'
+import { toArray, argumentsToValue, toValue, toLiquid, stringify, caseInsensitiveCompare, orderedCompare, isArray, isNil, isString, isFunction, isIterable, isArrayLike, readArrayElement, toEnumerable, advanceCodePoints, codePointLength, assert, Limiter, LiquidRuntimeError } from '../util'
 import { arrayIncludes, equals, evalToken, isTruthy } from '../render'
 import { Value, FilterImpl } from '../template'
 import { Tokenizer } from '../parser'
-import type { Scope } from '../context'
-import { EmptyDrop } from '../drop'
+import { readJSProperty, Scope } from '../context'
+import { Drop, EmptyDrop } from '../drop'
+
+function isPlainObject (val: unknown): val is Record<string, unknown> {
+  if (typeof val !== 'object' || val === null || isArray(val) || val instanceof Drop) return false
+  const proto = Object.getPrototypeOf(val)
+  return proto === null || proto === Object.prototype || proto?.constructor === Object
+}
+
+function flatten (arr: any[], out: any[], limiter?: Limiter): any[] {
+  for (const el of arr) {
+    const v = toValue(el)
+    if (isArray(v)) {
+      limiter?.use(1)
+      flatten(v, out, limiter)
+    } else {
+      limiter?.use(1)
+      out.push(el)
+    }
+  }
+  return out
+}
+
+function toInputArray (val: unknown, limiter?: Limiter): any[] {
+  val = toValue(toLiquid(val))
+  if (isNil(val)) return []
+  if (isArray(val)) {
+    if (val.every(el => !isArray(toValue(el)))) return val
+    return flatten(val, [], limiter)
+  }
+  if (isString(val)) return [val]
+  if (isPlainObject(val)) return [val]
+  if (isIterable(val)) {
+    const arr: any[] = []
+    for (const item of val) {
+      limiter?.use(1)
+      arr.push(item)
+    }
+    return arr
+  }
+  return [val]
+}
+
+function respondToBrackets (u: unknown): boolean {
+  u = toLiquid(toValue(toLiquid(u)))
+  if (typeof u === 'string') return true
+  if (typeof u === 'number' && Number.isInteger(u)) return true
+  if (isArray(u) || u instanceof Drop || isPlainObject(u)) return true
+  return false
+}
+
+function rubyInspect (v: unknown): string {
+  v = toValue(toLiquid(v))
+  if (isNil(v)) return 'nil'
+  if (typeof v === 'string') return JSON.stringify(v)
+  return rubyToS(v)
+}
+
+function rubyToS (v: unknown): string {
+  v = toValue(toLiquid(v))
+  if (isNil(v)) return ''
+  if (isArray(v)) return '[' + v.map(rubyInspect).join(', ') + ']'
+  if (isPlainObject(v)) {
+    return '{' + Object.entries(v).map(([k, val]) => `${rubyInspect(k)}=>${rubyInspect(val)}`).join(', ') + '}'
+  }
+  return stringify(v)
+}
+
+function * readDirectBracketProperty (this: FilterImpl, item: unknown, prop: unknown): Generator<unknown, unknown, unknown> {
+  const raw = toLiquid(item)
+  if (raw instanceof EmptyDrop) return null
+  const u = toLiquid(toValue(raw))
+  const p = toValue(toLiquid(prop))
+  if (typeof u === 'string') {
+    const k = stringify(p)
+    return u.includes(k) ? k : null
+  }
+  if ((typeof u === 'number' && Number.isInteger(u)) || isArray(u)) {
+    throw new LiquidRuntimeError(`cannot select the property '${rubyToS(prop)}'`)
+  }
+  const k = stringify(p)
+  if (u instanceof Drop) return yield this.context.readProperty(u as Scope, k)
+  const val = readJSProperty(u as Scope, k, this.context.ownPropertyOnly)
+  return isFunction(val) ? yield val.call(u) : val
+}
+
+function structuralKey (v: unknown, limiter: Limiter, ancestors: Set<object>, dropIds: WeakMap<object, number>, nextId: { n: number }): string {
+  v = toValue(toLiquid(v))
+  if (isNil(v)) return 'N'
+  if (typeof v === 'boolean') return v ? 'T' : 'F'
+  if (typeof v === 'number') return '#' + String(v)
+  if (typeof v === 'string') return '$' + JSON.stringify(v)
+  if (typeof v === 'object' && v !== null) {
+    if (ancestors.has(v)) return '@'
+    if (isArray(v)) {
+      limiter.use(v.length + 1)
+      ancestors.add(v)
+      const s = '[' + v.map(el => structuralKey(el, limiter, ancestors, dropIds, nextId)).join(',') + ']'
+      ancestors.delete(v)
+      return s
+    }
+    if (isPlainObject(v)) {
+      const obj = v
+      const keys = Object.keys(obj).sort()
+      limiter.use(keys.length + 1)
+      ancestors.add(obj)
+      const s = '{' + keys.map(k => `${JSON.stringify(k)}:${structuralKey(obj[k], limiter, ancestors, dropIds, nextId)}`).join(',') + '}'
+      ancestors.delete(obj)
+      return s
+    }
+    let id = dropIds.get(v)
+    if (id === undefined) {
+      id = ++nextId.n
+      dropIds.set(v, id)
+    }
+    return 'O' + id
+  }
+  return '?' + String(v)
+}
+
+function addUniqKey (raw: unknown, seen: Set<unknown>, structSeen: Set<string>, limiter: Limiter, dropIds: WeakMap<object, number>, nextId: { n: number }): boolean {
+  let val: unknown = toValue(toLiquid(raw))
+  if (isNil(val)) val = null
+  if (isArray(val) || isPlainObject(val)) {
+    const sk = structuralKey(val, limiter, new Set(), dropIds, nextId)
+    if (structSeen.has(sk)) return false
+    structSeen.add(sk)
+    return true
+  }
+  if (seen.has(val)) return false
+  seen.add(val)
+  return true
+}
 
 export const join = argumentsToValue(function (this: FilterImpl, v: any[], arg: string) {
-  const array = toArray(v)
+  const array = toInputArray(v, this.context.memoryLimit)
   const sep = isNil(arg) ? ' ' : stringify(arg)
   let outputSize = sep.length * Math.max(array.length - 1, 0)
-  for (let i = 0; i < array.length; i++) outputSize += String(array[i]).length
+  for (let i = 0; i < array.length; i++) outputSize += stringify(array[i]).length
   this.context.memoryLimit.use(outputSize)
-  return Array.prototype.join.call(array, sep)
+  return array.map(stringify).join(sep)
 })
 export const last = argumentsToValue(function (this: FilterImpl, v: any) {
   return isArrayLike(v) ? readArrayElement(v, -1, this.context.ownPropertyOnly) : ''
@@ -20,7 +151,7 @@ export const first = argumentsToValue(function (this: FilterImpl, v: any) {
   return isArrayLike(v) ? readArrayElement(v, 0, this.context.ownPropertyOnly) : ''
 })
 export const reverse = argumentsToValue(function (this: FilterImpl, v: any[]) {
-  const array = toArray(v)
+  const array = toInputArray(v, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   return [...array].reverse()
 })
@@ -68,15 +199,40 @@ export function * sum (this: FilterImpl, arr: Scope[], property?: string): Itera
   return sum
 }
 
-export function compact<T> (this: FilterImpl, arr: T[]) {
-  const array = toArray(arr)
+export function * compact (this: FilterImpl, arr: unknown, property?: unknown): IterableIterator<unknown> {
+  const array = toInputArray(arr, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
-  return Array.prototype.filter.call(array, x => !isNil(toValue(x)))
+  if (arguments.length < 2 || isNil(toValue(toLiquid(property)))) {
+    return array.filter(x => !isNil(toValue(toLiquid(x))))
+  }
+  if (!array.length) return []
+  const result = []
+  for (const item of array) {
+    if (!respondToBrackets(item)) return null
+    const val = yield * readDirectBracketProperty.call(this, item, property)
+    if (!isNil(toValue(toLiquid(val)))) result.push(item)
+  }
+  return result
 }
 
 export function concat<T1, T2> (this: FilterImpl, v: T1[], arg: T2[] = []): (T1 | T2)[] {
-  const lhs = toArray(v)
-  const rhs = toArray(arg)
+  const lhs = toInputArray(v, this.context.memoryLimit)
+  const argVal = toValue(toLiquid(arg))
+  let rhs: T2[]
+  if (isNil(argVal)) {
+    rhs = []
+  } else if (isArray(argVal)) {
+    rhs = argVal
+  } else if (isIterable(argVal)) {
+    rhs = []
+    for (const item of argVal) {
+      this.context.memoryLimit.use(1)
+      rhs.push(item)
+    }
+  } else {
+    assert(false, 'concat filter requires an array argument')
+    rhs = []
+  }
   this.context.memoryLimit.use(lhs.length + rhs.length)
   return Array.prototype.concat.call(lhs, rhs)
 }
@@ -251,10 +407,32 @@ export function * find_exp<T extends object> (this: FilterImpl, arr: T[], itemNa
   return result ? result[1] : undefined
 }
 
-export function uniq<T> (this: FilterImpl, arr: T[]): T[] {
-  arr = toArray(arr)
-  this.context.memoryLimit.use(arr.length)
-  return [...new Set(arr)]
+export function * uniq (this: FilterImpl, arr: unknown, property?: unknown): IterableIterator<unknown> {
+  const array = toInputArray(arr, this.context.memoryLimit)
+  this.context.memoryLimit.use(array.length)
+  const seen = new Set<unknown>()
+  const structSeen = new Set<string>()
+  const dropIds = new WeakMap<object, number>()
+  const nextId = { n: 0 }
+  if (arguments.length < 2 || isNil(toValue(toLiquid(property)))) {
+    const result = []
+    for (const x of array) {
+      if (addUniqKey(x, seen, structSeen, this.context.memoryLimit, dropIds, nextId)) {
+        result.push(x)
+      }
+    }
+    return result
+  }
+  if (array.length <= 1) return [...array]
+  const result = []
+  for (const item of array) {
+    if (!respondToBrackets(item)) return null
+    const val = yield * readDirectBracketProperty.call(this, item, property)
+    if (addUniqKey(val, seen, structSeen, this.context.memoryLimit, dropIds, nextId)) {
+      result.push(item)
+    }
+  }
+  return result
 }
 
 export function sample<T> (this: FilterImpl, v: T[] | string, count = 1): T | string | (T | string)[] {

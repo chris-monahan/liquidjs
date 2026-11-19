@@ -47,3 +47,23 @@ Output
 - sports
 - technology
 ```
+
+An optional argument specifies which property of the array's items to check for `nil` values.
+
+Input
+```liquid
+{% assign categorized_pages = site.pages | compact: "category" %}
+
+{% for page in categorized_pages %}
+- {{ page.category }}
+{% endfor %}
+```
+
+Output
+```text
+- business
+- celebrities
+- lifestyle
+- sports
+- technology
+```

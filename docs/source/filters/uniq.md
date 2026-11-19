@@ -16,3 +16,20 @@ Output
 ```text
 ants, bugs, bees
 ```
+
+An optional argument specifies which property of the array's items to use to determine uniqueness.
+
+Input
+```liquid
+{% assign unique_products = products | uniq: "type" %}
+{% for product in unique_products -%}
+- {{ product.title }}
+{% endfor %}
+```
+
+Output
+```text
+- Vacuum
+- Spatula
+- Coffee mug
+```
