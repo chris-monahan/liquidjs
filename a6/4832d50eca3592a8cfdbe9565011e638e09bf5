@@ -1,0 +1,24 @@
+docs/source/_data/sidebar.yml
+  h_f60b77838d081d 130
+docs/source/tags/ifchanged.md
+  h_f60b77838d081d 1-35
+docs/source/tags/overview.md
+  h_f60b77838d081d 12
+src/tags/ifchanged.ts
+  h_f60b77838d081d 1-33
+src/tags/index.ts
+  h_f60b77838d081d 11,37,50
+test/integration/tags/ifchanged.spec.ts
+  h_f60b77838d081d 1-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a64832d50eca3592a8cfdbe9565011e638e09bf5",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
