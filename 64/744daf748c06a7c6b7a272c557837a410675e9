@@ -1,0 +1,24 @@
+src/render/expression.ts
+  h_f60b77838d081d 13,16-33
+src/render/operator.ts
+  h_f60b77838d081d 3-4,6,8-40,58-60,63-65,68-70,73-75,79-81,84,85
+src/tags/if.ts
+  h_f60b77838d081d 4,41-43
+src/tags/unless.ts
+  h_f60b77838d081d 4,49-51
+test/integration/tags/case.spec.ts
+  h_f60b77838d081d 161-164
+test/integration/tags/if.spec.ts
+  h_f60b77838d081d 262-292
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "64744daf748c06a7c6b7a272c557837a410675e9",
+  "prompts": {},
+  "humans": {
+    "h_f60b77838d081d": {
+      "author": "Christopher Monahan <17766780+chris-monahan@users.noreply.github.com>"
+    }
+  }
+}
