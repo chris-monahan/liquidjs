@@ -4,9 +4,10 @@ import { Value, FilterImpl } from '../template'
 import { Tokenizer } from '../parser'
 import type { Scope } from '../context'
 import { EmptyDrop } from '../drop'
+import { LiquidRange } from '../util/liquid-range'
 
 export const join = argumentsToValue(function (this: FilterImpl, v: any[], arg: string) {
-  const array = toArray(v)
+  const array = toArray(v, this.context.memoryLimit)
   const sep = isNil(arg) ? ' ' : stringify(arg)
   let outputSize = sep.length * Math.max(array.length - 1, 0)
   for (let i = 0; i < array.length; i++) outputSize += String(array[i]).length
@@ -14,20 +15,22 @@ export const join = argumentsToValue(function (this: FilterImpl, v: any[], arg: 
   return Array.prototype.join.call(array, sep)
 })
 export const last = argumentsToValue(function (this: FilterImpl, v: any) {
+  if (v instanceof LiquidRange) return v.stop
   return isArrayLike(v) ? readArrayElement(v, -1, this.context.ownPropertyOnly) : ''
 })
 export const first = argumentsToValue(function (this: FilterImpl, v: any) {
+  if (v instanceof LiquidRange) return v.start
   return isArrayLike(v) ? readArrayElement(v, 0, this.context.ownPropertyOnly) : ''
 })
 export const reverse = argumentsToValue(function (this: FilterImpl, v: any[]) {
-  const array = toArray(v)
+  const array = toArray(v, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   return [...array].reverse()
 })
 
 function * sortBy<T> (this: FilterImpl, arr: T[], property: string | undefined, comparator: (a: unknown, b: unknown) => number): IterableIterator<unknown> {
   const values: [T, unknown][] = []
-  const array = toArray(arr)
+  const array = toArray(arr, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   for (const item of array) {
     values.push([
@@ -50,7 +53,7 @@ export const size = (v: string | any[]) => (v && v.length) || 0
 
 export function * map (this: FilterImpl, arr: Scope[], property: string): IterableIterator<unknown> {
   const results = []
-  const array = toArray(arr)
+  const array = toArray(arr, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   for (const item of array) {
     results.push(yield this.context._getFromScope(item, stringify(property), false))
@@ -60,7 +63,7 @@ export function * map (this: FilterImpl, arr: Scope[], property: string): Iterab
 
 export function * sum (this: FilterImpl, arr: Scope[], property?: string): IterableIterator<unknown> {
   let sum = 0
-  const array = toArray(arr)
+  const array = toArray(arr, this.context.memoryLimit)
   for (const item of array) {
     const data = Number(property ? yield this.context._getFromScope(item, stringify(property), false) : item)
     sum += Number.isNaN(data) ? 0 : data
@@ -69,14 +72,14 @@ export function * sum (this: FilterImpl, arr: Scope[], property?: string): Itera
 }
 
 export function compact<T> (this: FilterImpl, arr: T[]) {
-  const array = toArray(arr)
+  const array = toArray(arr, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   return Array.prototype.filter.call(array, x => !isNil(toValue(x)))
 }
 
 export function concat<T1, T2> (this: FilterImpl, v: T1[], arg: T2[] = []): (T1 | T2)[] {
-  const lhs = toArray(v)
-  const rhs = toArray(arg)
+  const lhs = toArray(v, this.context.memoryLimit)
+  const rhs = toArray(arg, this.context.memoryLimit)
   this.context.memoryLimit.use(lhs.length + rhs.length)
   return Array.prototype.concat.call(lhs, rhs)
 }
@@ -86,7 +89,7 @@ export function push<T> (this: FilterImpl, v: T[], arg: T): T[] {
 }
 
 export function unshift<T> (this: FilterImpl, v: T[], arg: T): T[] {
-  const array = toArray(v)
+  const array = toArray(v, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   const clone = [...array]
   clone.unshift(arg)
@@ -94,7 +97,7 @@ export function unshift<T> (this: FilterImpl, v: T[], arg: T): T[] {
 }
 
 export function pop<T> (this: FilterImpl, v: T[]): T[] {
-  const array = toArray(v)
+  const array = toArray(v, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   const clone = [...array]
   clone.pop()
@@ -102,7 +105,7 @@ export function pop<T> (this: FilterImpl, v: T[]): T[] {
 }
 
 export function shift<T> (this: FilterImpl, v: T[]): T[] {
-  const array = toArray(v)
+  const array = toArray(v, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   const clone = [...array]
   clone.shift()
@@ -132,7 +135,7 @@ function * matches (this: FilterImpl, value: unknown, expected: unknown): Genera
 }
 
 function * filter<T extends object> (this: FilterImpl, include: boolean, arr: T[], property: string, expected: any): IterableIterator<unknown> {
-  arr = toArray(arr)
+  arr = toArray(arr, this.context.memoryLimit)
   this.context.memoryLimit.use(arr.length)
   const token = new Tokenizer(stringify(property)).readScopeValue()
   const result: T[] = []
@@ -146,7 +149,7 @@ function * filter<T extends object> (this: FilterImpl, include: boolean, arr: T[
 function * filter_exp<T extends object> (this: FilterImpl, include: boolean, arr: T[], itemName: string, exp: string): IterableIterator<unknown> {
   const filtered: unknown[] = []
   const keyTemplate = new Value(stringify(exp), this.liquid)
-  const array = toArray(arr)
+  const array = toArray(arr, this.context.memoryLimit)
   this.context.memoryLimit.use(array.length)
   for (const item of array) {
     this.context.push({ [itemName]: item })
@@ -175,7 +178,7 @@ export function * reject_exp<T extends object> (this: FilterImpl, arr: T[], item
 
 export function * group_by<T extends object> (this: FilterImpl, arr: T[], property: string): IterableIterator<unknown> {
   const map = new Map()
-  arr = toEnumerable(arr)
+  arr = toEnumerable(arr, this.context.memoryLimit)
   const token = new Tokenizer(stringify(property)).readScopeValue()
   this.context.memoryLimit.use(arr.length)
   for (const item of arr) {
@@ -189,7 +192,7 @@ export function * group_by<T extends object> (this: FilterImpl, arr: T[], proper
 export function * group_by_exp<T extends object> (this: FilterImpl, arr: T[], itemName: string, exp: string): IterableIterator<unknown> {
   const map = new Map()
   const keyTemplate = new Value(stringify(exp), this.liquid)
-  arr = toEnumerable(arr)
+  arr = toEnumerable(arr, this.context.memoryLimit)
   this.context.memoryLimit.use(arr.length)
   for (const item of arr) {
     this.context.push({ [itemName]: item })
@@ -203,7 +206,7 @@ export function * group_by_exp<T extends object> (this: FilterImpl, arr: T[], it
 
 function * search<T extends object> (this: FilterImpl, arr: T[], property: string, expected: string): IterableIterator<unknown> {
   const token = new Tokenizer(stringify(property)).readScopeValue()
-  const array = toArray(arr)
+  const array = toArray(arr, this.context.memoryLimit)
   for (let index = 0; index < array.length; index++) {
     const value = yield evalToken(token, this.context.spawn(array[index]))
     if (yield matches.call(this, value, expected)) return [index, array[index]]
@@ -212,7 +215,7 @@ function * search<T extends object> (this: FilterImpl, arr: T[], property: strin
 
 function * search_exp<T extends object> (this: FilterImpl, arr: T[], itemName: string, exp: string): IterableIterator<unknown> {
   const predicate = new Value(stringify(exp), this.liquid)
-  const array = toArray(arr)
+  const array = toArray(arr, this.context.memoryLimit)
   for (let index = 0; index < array.length; index++) {
     this.context.push({ [itemName]: array[index] })
     const value = yield predicate.value(this.context)
@@ -252,7 +255,7 @@ export function * find_exp<T extends object> (this: FilterImpl, arr: T[], itemNa
 }
 
 export function uniq<T> (this: FilterImpl, arr: T[]): T[] {
-  arr = toArray(arr)
+  arr = toArray(arr, this.context.memoryLimit)
   this.context.memoryLimit.use(arr.length)
   return [...new Set(arr)]
 }

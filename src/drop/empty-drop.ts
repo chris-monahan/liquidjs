@@ -1,12 +1,14 @@
 import { Drop } from './drop'
 import { Comparable } from './comparable'
 import { isObject, isString, isArray, toValue } from '../util'
+import { LiquidRange } from '../util/liquid-range'
 
 export class EmptyDrop extends Drop implements Comparable {
   public * equals (value: any): Generator<unknown, boolean, any> {
     if (value instanceof EmptyDrop) return false
     value = yield toValue(value)
     if (isString(value) || isArray(value)) return value.length === 0
+    if (value instanceof LiquidRange) return false
     if (isObject(value)) return Object.keys(value).length === 0
     return false
   }

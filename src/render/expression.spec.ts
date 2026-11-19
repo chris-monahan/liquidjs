@@ -2,7 +2,7 @@ import { Tokenizer } from '../parser'
 import { Drop } from '../drop'
 import { QuotedToken } from '../tokens'
 import { Context } from '../context'
-import { toPromise, toValueSync } from '../util'
+import { toPromise, toValueSync, LiquidRange } from '../util'
 import { evalQuotedToken } from './expression'
 
 describe('Expression', function () {
@@ -219,17 +219,17 @@ describe('Expression', function () {
   describe('range', function () {
     const ctx = new Context({ two: 2, num: { one: 1, two: 2 } })
     it('should eval range expression', async function () {
-      expect(await toPromise(create('(2..4)').evaluate(ctx, false))).toEqual([2, 3, 4])
-      expect(await toPromise(create('(two..4)').evaluate(ctx, false))).toEqual([2, 3, 4])
+      expect(await toPromise(create('(2..4)').evaluate(ctx, false))).toEqual(new LiquidRange(2, 4))
+      expect(await toPromise(create('(two..4)').evaluate(ctx, false))).toEqual(new LiquidRange(2, 4))
     })
     it('should allow property access expression as variables', async function () {
-      expect(await toPromise(create('(num.one..num.two)').evaluate(ctx))).toEqual([1, 2])
-      expect(await toPromise(create('(num.one .. two)').evaluate(ctx))).toEqual([1, 2])
+      expect(await toPromise(create('(num.one..num.two)').evaluate(ctx))).toEqual(new LiquidRange(1, 2))
+      expect(await toPromise(create('(num.one .. two)').evaluate(ctx))).toEqual(new LiquidRange(1, 2))
     })
     it('should allow blanks in range', async function () {
-      expect(await toPromise(create('(3 ..5)').evaluate(ctx))).toEqual([3, 4, 5])
-      expect(await toPromise(create('(3 .. 5)').evaluate(ctx))).toEqual([3, 4, 5])
-      expect(await toPromise(create('( 3 .. 5 )').evaluate(ctx))).toEqual([3, 4, 5])
+      expect(await toPromise(create('(3 ..5)').evaluate(ctx))).toEqual(new LiquidRange(3, 5))
+      expect(await toPromise(create('(3 .. 5)').evaluate(ctx))).toEqual(new LiquidRange(3, 5))
+      expect(await toPromise(create('( 3 .. 5 )').evaluate(ctx))).toEqual(new LiquidRange(3, 5))
     })
     it('should throw if .. not matched', async function () {
       expect(() => create('(3.5')).toThrow('invalid range syntax')

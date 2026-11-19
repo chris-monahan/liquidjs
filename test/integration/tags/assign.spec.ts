@@ -23,10 +23,10 @@ describe('tags/assign', function () {
     const html = await liquid.parseAndRender(src)
     return expect(html).toBe('10086')
   })
-  it('should assign as array', async function () {
+  it('should assign range', async function () {
     const src = '{% assign foo=(1..3) %}{{foo}}'
     const html = await liquid.parseAndRender(src)
-    return expect(html).toBe('123')
+    return expect(html).toBe('1..3')
   })
   it('should assign as filter result', async function () {
     const src = '{% assign foo="a b" | capitalize | split: " " | first %}{{foo}}'
@@ -105,7 +105,7 @@ describe('tags/assign', function () {
       expect(await ge.parseAndRender('{% assign x = (name | upcase) %}{{ x }}', { name: 'bar' })).toBe('BAR')
     })
     it('should assign a grouped range', async () => {
-      expect(await ge.parseAndRender('{% assign x = (1..(items | size)) %}{{ x }}', { items: ['a', 'b', 'c'] })).toBe('123')
+      expect(await ge.parseAndRender('{% assign x = (1..(items | size)) %}{{ x }}', { items: ['a', 'b', 'c'] })).toBe('1..3')
     })
   })
 })

@@ -1,3 +1,4 @@
+import { LiquidRange } from '../util/liquid-range'
 import { getPerformance } from '../util/performance'
 import { Drop } from '../drop/drop'
 import { __assign } from 'tslib'
@@ -129,9 +130,17 @@ export class Context {
   }
   readProperty (obj: Scope, key: (PropertyKey | Drop)) {
     obj = toLiquid(obj)
-    key = toValue(key) as PropertyKey
+    const rawKey = toValue(key)
     if (isNil(obj)) return obj
+    if (rawKey instanceof LiquidRange && !(obj instanceof Drop)) return undefined
+    key = rawKey as PropertyKey
     if (isArray(obj) && isNumber(key)) return readArrayElement(obj, key, this.ownPropertyOnly)
+    if (obj instanceof LiquidRange) {
+      if (key === 'first') return obj.start
+      if (key === 'last') return obj.stop
+      if (key === 'size') return obj.length
+      return undefined
+    }
     const value = readJSProperty(obj, key, this.ownPropertyOnly)
     if (value === undefined && obj instanceof Drop) return obj.liquidMethodMissing(key, this)
     if (isFunction(value)) return value.call(obj)

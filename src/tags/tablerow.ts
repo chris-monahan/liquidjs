@@ -1,4 +1,5 @@
-import { isValueToken, toEnumerable } from '../util'
+import { isValueToken, toEnumerable, toValue } from '../util'
+import { LiquidRange } from '../util/liquid-range'
 import { createScope } from '../context/scope'
 import { ValueToken, Liquid, Tag, evalToken, Emitter, Hash, TagToken, TopLevelToken, Context, Template, ParseStream, FilteredValueToken } from '..'
 import { TablerowloopDrop } from '../drop/tablerowloop-drop'
@@ -39,7 +40,9 @@ export default class extends Tag {
   }
 
   * render (ctx: Context, emitter: Emitter): Generator<unknown, void, unknown> {
-    let collection = toEnumerable(yield evalToken(this.collection, ctx))
+    const val = yield toValue(yield evalToken(this.collection, ctx))
+    if (val instanceof LiquidRange) ctx.memoryLimit.use(val.length)
+    let collection = toEnumerable(val)
     const args = (yield this.args.render(ctx)) as Record<string, any>
     const offset = args.offset || 0
     const limit = (args.limit === undefined) ? collection.length : args.limit

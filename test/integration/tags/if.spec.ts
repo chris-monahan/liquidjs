@@ -1,4 +1,4 @@
-import { Liquid, Drop } from '../../../src'
+import { Liquid, Drop, LiquidRange } from '../../../src'
 
 describe('tags/if', function () {
   const liquid = new Liquid()
@@ -207,7 +207,7 @@ describe('tags/if', function () {
       })
       it('should keep range syntax working', function () {
         const result = ge.evalValueSync('(1..5)', {})
-        return expect(result).toEqual([1, 2, 3, 4, 5])
+        return expect(result).toEqual(new LiquidRange(1, 5))
       })
       it('should support chained filters in condition', async function () {
         const src = '{% if (name | downcase | size) > 3 %}long{% else %}short{% endif %}'
