@@ -1,4 +1,4 @@
-import { toArray, argumentsToValue, toValue, stringify, caseInsensitiveCompare, orderedCompare, isArray, isNil, isArrayLike, readArrayElement, toEnumerable, advanceCodePoints, codePointLength } from '../util'
+import { toArray, argumentsToValue, toValue, stringify, caseInsensitiveCompare, orderedCompare, isArray, isNil, readFirst, readLast, readSize, toEnumerable, advanceCodePoints, codePointLength } from '../util'
 import { arrayIncludes, equals, evalToken, isTruthy } from '../render'
 import { Value, FilterImpl } from '../template'
 import { Tokenizer } from '../parser'
@@ -14,10 +14,10 @@ export const join = argumentsToValue(function (this: FilterImpl, v: any[], arg: 
   return Array.prototype.join.call(array, sep)
 })
 export const last = argumentsToValue(function (this: FilterImpl, v: any) {
-  return isArrayLike(v) ? readArrayElement(v, -1, this.context.ownPropertyOnly) : ''
+  return readLast(v, this.context.ownPropertyOnly) ?? null
 })
 export const first = argumentsToValue(function (this: FilterImpl, v: any) {
-  return isArrayLike(v) ? readArrayElement(v, 0, this.context.ownPropertyOnly) : ''
+  return readFirst(v, this.context.ownPropertyOnly) ?? null
 })
 export const reverse = argumentsToValue(function (this: FilterImpl, v: any[]) {
   const array = toArray(v)
@@ -46,7 +46,7 @@ export function * sort_natural<T> (this: FilterImpl, arr: T[], property?: string
   return yield * sortBy.call(this, arr, property, caseInsensitiveCompare)
 }
 
-export const size = (v: string | any[]) => (v && v.length) || 0
+export const size = argumentsToValue((v: any) => readSize(v) ?? 0)
 
 export function * map (this: FilterImpl, arr: Scope[], property: string): IterableIterator<unknown> {
   const results = []

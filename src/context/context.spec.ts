@@ -1,5 +1,7 @@
 import { Context } from './context'
 import { Scope } from './scope'
+import { Drop } from '../drop/drop'
+import { toValueSync } from '../util'
 
 describe('Context', function () {
   let ctx: any, scope: Scope
@@ -79,6 +81,56 @@ describe('Context', function () {
     })
     it('should call function before read nested property', async function () {
       expect(ctx.get(['objFunc', 'prop'])).toEqual('PROP')
+    })
+    it('should read .first, .last and .size of string by code point', function () {
+      const strCtx = new Context({ s: 'hello', e: '', u1: 'a😀b', u2: '😀🎉' })
+      expect(strCtx.getSync(['s', 'first'])).toBe('h')
+      expect(strCtx.getSync(['s', 'last'])).toBe('o')
+      expect(strCtx.getSync(['e', 'first'])).toBe('')
+      expect(strCtx.getSync(['e', 'last'])).toBe('')
+      expect(strCtx.getSync(['s', 0])).toBeUndefined()
+      expect(strCtx.getSync(['u1', 'first'])).toBe('a')
+      expect(strCtx.getSync(['u1', 'last'])).toBe('b')
+      expect(strCtx.getSync(['u1', 'size'])).toBe(3)
+      expect(strCtx.getSync(['u2', 'first'])).toBe('😀')
+      expect(strCtx.getSync(['u2', 'last'])).toBe('🎉')
+      expect(strCtx.getSync(['u2', 'size'])).toBe(2)
+    })
+    it('should support .first, .last and .size on plain objects with own-key precedence', function () {
+      const objCtx = new Context({
+        h: { hello: 'world', foo: 'bar' },
+        empty: {},
+        withFirst: { first: 'F', a: 1 },
+        withSize: { size: 99, a: 1 },
+        withLength: { length: 99 }
+      })
+      expect(objCtx.getSync(['h', 'first'])).toEqual(['hello', 'world'])
+      expect(objCtx.getSync(['h', 'last'])).toBeUndefined()
+      expect(objCtx.getSync(['empty', 'first'])).toBeUndefined()
+      expect(objCtx.getSync(['withFirst', 'first'])).toBe('F')
+      expect(objCtx.getSync(['withSize', 'size'])).toBe(99)
+      expect(objCtx.getSync(['withLength', 'size'])).toBe(1)
+    })
+    it('should not trigger commands when command lookup is disabled', function () {
+      const cmdCtx = new Context({
+        a: ['x', 'y'],
+        h: { hello: 'world' },
+        withFirst: { first: 'F' },
+        s: 'hello'
+      })
+      expect(toValueSync(cmdCtx._get(['a', 'first'], [false, false]))).toBeUndefined()
+      expect(toValueSync(cmdCtx._get(['a', 'last'], [false, false]))).toBeUndefined()
+      expect(toValueSync(cmdCtx._get(['a', 'size'], [false, false]))).toBeUndefined()
+      expect(toValueSync(cmdCtx._get(['h', 'first'], [false, false]))).toBeUndefined()
+      expect(toValueSync(cmdCtx._get(['withFirst', 'first'], [false, false]))).toBe('F')
+      expect(toValueSync(cmdCtx._get(['s', 'first'], [false, false]))).toBeUndefined()
+    })
+    it('should not fall back to commands on Drop instances', function () {
+      class PlainDrop extends Drop {}
+      const dropCtx = new Context({ d: new PlainDrop() })
+      expect(dropCtx.getSync(['d', 'size'])).toBeUndefined()
+      expect(dropCtx.getSync(['d', 'first'])).toBeUndefined()
+      expect(dropCtx.getSync(['d', 'last'])).toBeUndefined()
     })
   })
 

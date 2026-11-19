@@ -152,6 +152,46 @@ export function isObject (value: any): value is object {
   return value !== null && (type === 'object' || type === 'function')
 }
 
+export function isPlainObject (value: any): value is Record<string, any> {
+  if (!isObject(value)) return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === null || proto === Object.prototype
+}
+
+export function readFirst (v: any, ownPropertyOnly: boolean) {
+  if (isString(v)) return v.length === 0 ? '' : v.slice(0, advanceCodePoints(v, 0, 1))
+  if (isArray(v)) return readArrayElement(v, 0, ownPropertyOnly)
+  if (isIterable(v)) {
+    for (const val of v) return val
+    return undefined
+  }
+  if (isPlainObject(v)) {
+    const keys = Object.keys(v)
+    return keys.length ? [keys[0], v[keys[0]]] : undefined
+  }
+}
+
+export function readLast (v: any, ownPropertyOnly: boolean) {
+  if (isString(v)) {
+    if (v.length === 0) return ''
+    const lastCode = v.charCodeAt(v.length - 1)
+    if (lastCode >= 0xDC00 && lastCode <= 0xDFFF && v.length >= 2) {
+      const prevCode = v.charCodeAt(v.length - 2)
+      if (prevCode >= 0xD800 && prevCode <= 0xDBFF) return v.slice(-2)
+    }
+    return v[v.length - 1]
+  }
+  if (isArray(v)) return readArrayElement(v, -1, ownPropertyOnly)
+}
+
+export function readSize (v: any) {
+  if (isArray(v)) return v.length
+  if (isString(v)) return codePointLength(v)
+  if (v instanceof Set || v instanceof Map) return v.size
+  if (isPlainObject(v)) return Object.keys(v).length
+  if (isArrayLike(v)) return v.length
+}
+
 export function range (start: number, stop: number, step = 1) {
   const arr: number[] = []
   for (let i = start; i < stop; i += step) {

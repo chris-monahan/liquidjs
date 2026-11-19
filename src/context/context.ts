@@ -1,3 +1,4 @@
+import { codePointLength, readFirst, readLast, readSize } from '../util/underscore'
 import { getPerformance } from '../util/performance'
 import { Drop } from '../drop/drop'
 import { __assign } from 'tslib'
@@ -78,9 +79,10 @@ export class Context {
   public getSync (paths: PropertyKey[]): unknown {
     return toValueSync(this._get(paths))
   }
-  public * _get (paths: (PropertyKey | Drop)[]): IterableIterator<unknown> {
+  public * _get (paths: (PropertyKey | Drop)[] | string, commands?: boolean[]): IterableIterator<unknown> {
+    if (isString(paths)) paths = paths.split('.')
     const scope = this.findScope(paths[0] as string) // first prop should always be a string
-    return yield this._getFromScope(scope, paths)
+    return yield this._getFromScope(scope, paths, this.strictVariables, commands ?? paths.map((_, i) => i > 0))
   }
   /**
    * @deprecated use `_get()` instead
@@ -88,10 +90,10 @@ export class Context {
   public getFromScope (scope: unknown, paths: PropertyKey[] | string): IterableIterator<unknown> {
     return toValueSync(this._getFromScope(scope, paths))
   }
-  public * _getFromScope (scope: unknown, paths: (PropertyKey | Drop)[] | string, strictVariables = this.strictVariables): IterableIterator<unknown> {
+  public * _getFromScope (scope: unknown, paths: (PropertyKey | Drop)[] | string, strictVariables = this.strictVariables, commands?: boolean[]): IterableIterator<unknown> {
     if (isString(paths)) paths = paths.split('.')
     for (let i = 0; i < paths.length; i++) {
-      scope = yield this.readProperty(scope as object, paths[i])
+      scope = yield this.readProperty(scope as object, paths[i], commands ? commands[i] : true)
       if (strictVariables && isUndefined(scope)) {
         throw new InternalUndefinedVariableError((paths as string[]).slice(0, i + 1).join!('.'))
       }
@@ -127,17 +129,28 @@ export class Context {
     if (key in this.environments) return this.environments
     return this.globals
   }
-  readProperty (obj: Scope, key: (PropertyKey | Drop)) {
+  readProperty (obj: Scope, key: (PropertyKey | Drop), allowCommand = true) {
     obj = toLiquid(obj)
     key = toValue(key) as PropertyKey
     if (isNil(obj)) return obj
     if (isArray(obj) && isNumber(key)) return readArrayElement(obj, key, this.ownPropertyOnly)
+    if (isString(obj)) {
+      if (!allowCommand) return undefined
+      if (key === 'first') return readFirst(obj, this.ownPropertyOnly)
+      if (key === 'last') return readLast(obj, this.ownPropertyOnly)
+      if (key === 'size' || key === 'length') return codePointLength(obj)
+      return undefined
+    }
     const value = readJSProperty(obj, key, this.ownPropertyOnly)
     if (value === undefined && obj instanceof Drop) return obj.liquidMethodMissing(key, this)
     if (isFunction(value)) return value.call(obj)
-    if (key === 'size') return readSize(obj)
-    else if (key === 'first') return readFirst(obj, this.ownPropertyOnly)
-    else if (key === 'last') return readLast(obj, this.ownPropertyOnly)
+    if (obj instanceof Drop) return value
+    if (value !== undefined || (!this.ownPropertyOnly && key in Object(obj)) || hasOwnProperty.call(obj, key)) return value
+    if (allowCommand) {
+      if (key === 'size') return readSize(obj)
+      else if (key === 'first') return readFirst(obj, this.ownPropertyOnly)
+      else if (key === 'last') return readLast(obj, this.ownPropertyOnly)
+    }
     return value
   }
 }
@@ -145,20 +158,4 @@ export class Context {
 export function readJSProperty (obj: Scope, key: PropertyKey, ownPropertyOnly: boolean) {
   if (ownPropertyOnly && !hasOwnProperty.call(obj, key) && !(obj instanceof Drop)) return undefined
   return obj[key]
-}
-
-function readFirst (obj: Scope, ownPropertyOnly: boolean) {
-  if (isArray(obj)) return readArrayElement(obj, 0, ownPropertyOnly)
-  return readJSProperty(obj, 'first', ownPropertyOnly)
-}
-
-function readLast (obj: Scope, ownPropertyOnly: boolean) {
-  if (isArray(obj)) return readArrayElement(obj, -1, ownPropertyOnly)
-  return readJSProperty(obj, 'last', ownPropertyOnly)
-}
-
-function readSize (obj: Scope) {
-  if (hasOwnProperty.call(obj, 'size') || obj['size'] !== undefined) return obj['size']
-  if (isArray(obj) || isString(obj)) return obj.length
-  if (typeof obj === 'object') return Object.keys(obj).length
 }

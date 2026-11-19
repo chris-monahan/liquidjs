@@ -257,6 +257,20 @@ describe('filters/array', function () {
     it('should return 0 for nil', () => test('{{ nil | size }}', '0'))
     it('should return 0 for undefined', () => test('{{ foo | size }}', '0'))
     it('should work for string', () => test('{{ "foo" | size }}', {}, '3'))
+    it('should count code points for multi-byte Unicode strings', () => test(
+      '{{ "a😀b" | size }}|{{ "a😀b".size }}|{{ s | size }}|{{ s.size }}',
+      { s: '😀🎉' },
+      '3|3|2|2'
+    ))
+    it('should support plain objects with size and length keys', async () => {
+      await test('{{ h | size }}|{{ h.size }}', { h: { size: 99, a: 1 } }, '2|99')
+      await test('{{ h | size }}|{{ h.size }}', { h: { length: 99 } }, '1|1')
+    })
+    it('should not trigger size command via bracket lookup', () => test(
+      '{% if a["size"] == nil and s["size"] == nil and h["size"] == nil %}ok{% endif %}',
+      { a: [1, 2], s: 'hello', h: { a: 1 } },
+      'ok'
+    ))
   })
   describe('first', function () {
     it('should support first', () => test(
@@ -267,7 +281,35 @@ describe('filters/array', function () {
     it('should return empty for nil', () => test('{{nil | first}}', ''))
     it('should return empty for undefined', () => test('{{foo | first}}', ''))
     it('should return empty for false', () => test('{{false | first}}', ''))
+    it('should serialize missing first as null in json', () => test('{{ nil | first | json }}', 'null'))
     it('should work for string', () => test('{{ "foo" | first }}', 'f'))
+    it('should support string .first, .last, empty string, and nil string indexing', () => test(
+      '{{ s.first }}|{{ s.last }}|{{ e.first }}|{{ s[0] }}',
+      { s: 'hello', e: '' },
+      'h|o||'
+    ))
+    it('should support surrogate pairs in first', () => test(
+      '{{ "a😀b" | first }}|{{ "😀🎉" | first }}|{{ s.first }}',
+      { s: '😀🎉' },
+      'a|😀|😀'
+    ))
+    it('should support plain object first and own first key precedence', async () => {
+      await test(
+        '{{ h.first }}|{{ h.first[0] }}|{{ h.first[1] }}|{{ empty_h.first }}|{{ empty_h | first | json }}',
+        { h: { hello: 'world', foo: 'bar' }, empty_h: {} },
+        'helloworld|hello|world||null'
+      )
+      await test(
+        '{{ h.first }}|{{ h["first"] }}|{{ h | first | json }}',
+        { h: { first: 'F', a: 1 } },
+        'F|F|["first","F"]'
+      )
+    })
+    it('should not trigger first command via bracket lookup', () => test(
+      '{% if a["first"] == nil and h["first"] == nil and s["first"] == nil and s[0] == nil %}ok{% endif %}',
+      { a: [1, 2], h: { a: 1 }, s: 'hello' },
+      'ok'
+    ))
   })
   describe('last', function () {
     it('should support last', () => test(
@@ -278,7 +320,23 @@ describe('filters/array', function () {
     it('should return empty for nil', () => test('{{nil | last}}', ''))
     it('should return empty for undefined', () => test('{{foo | last}}', ''))
     it('should return empty for false', () => test('{{false | last}}', ''))
+    it('should serialize missing last as null in json', () => test('{{ nil | last | json }}', 'null'))
     it('should work for string', () => test('{{ "foo" | last }}', {}, 'o'))
+    it('should support surrogate pairs in last', () => test(
+      '{{ "a😀b" | last }}|{{ "😀🎉" | last }}|{{ s.last }}|{{ e.last }}',
+      { s: '😀🎉', e: '' },
+      'b|🎉|🎉|'
+    ))
+    it('should return nil for plain object last', () => test(
+      '{{ h.last }}|{% if h.last == nil %}nil{% endif %}|{{ h | last | json }}',
+      { h: { hello: 'world', foo: 'bar' } },
+      '|nil|null'
+    ))
+    it('should not trigger last command via bracket lookup', () => test(
+      '{% if a["last"] == nil and s["last"] == nil %}ok{% endif %}',
+      { a: [1, 2], s: 'hello' },
+      'ok'
+    ))
   })
   describe('slice', function () {
     it('should slice first char by 0', () => test('{{ "Liquid" | slice: 0 }}', 'L'))
